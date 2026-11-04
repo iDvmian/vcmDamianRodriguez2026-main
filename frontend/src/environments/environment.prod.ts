@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://plataforma-vinculacion-ucm-production.up.railway.app/api'
+  apiUrl: 'http://161.97.72.209:8081/api'
 };
