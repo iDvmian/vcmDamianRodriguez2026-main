@@ -3,6 +3,7 @@ import { authGuard, noAuthGuard, noClienteGuard, soloRolesGuard } from './core/g
 import { LoginComponent } from './features/auth/login/login.component';
 import { RegisterComponent } from './features/auth/register/register.component';
 import { ForgotPasswordComponent } from './features/auth/forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './features/auth/reset-password/reset-password.component';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 
@@ -13,6 +14,7 @@ export const routes: Routes = [
   { path: 'login',            component: LoginComponent,           canActivate: [noAuthGuard] },
   { path: 'register',         component: RegisterComponent,        canActivate: [noAuthGuard] },
   { path: 'forgot-password',  component: ForgotPasswordComponent,  canActivate: [noAuthGuard] },
+  { path: 'reset-password',   component: ResetPasswordComponent,   canActivate: [noAuthGuard] },
 
   // Rutas protegidas dentro del layout principal
   {

@@ -112,6 +112,20 @@ model User {
   planteamientosComoDocente Planteamiento[] @relation("DocentePlanteamiento")
   historialEtapas           HistorialEtapa[] @relation("UsuarioHistorial")
   observacionesComoAutor    Observacion[]   @relation("AutorObservacion")
+  passwordResetTokens       PasswordResetToken[]
+}
+
+/// Token de un solo uso para restablecer la contraseña (se guarda solo su hash SHA-256)
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Facultad {

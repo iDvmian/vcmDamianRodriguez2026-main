@@ -35,6 +35,14 @@ export class AuthService {
     return this.http.post(`${environment.apiUrl}/auth/register`, data);
   }
 
+  forgotPassword(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/reset-password`, { token, password });
+  }
+
   /** Actualiza el usuario guardado en el navegador (p. ej. tras editar el perfil). */
   updateStoredUser(user: Partial<User>): void {
     const current = this.getCurrentUser();

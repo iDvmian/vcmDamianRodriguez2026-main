@@ -301,4 +301,64 @@ export class MailService {
     }
     return true;
   }
+
+  async sendRecuperacionPassword(params: {
+    to: string;
+    nombre: string;
+    enlace: string;
+    minutos: number;
+  }): Promise<void> {
+    const { to, nombre, enlace, minutos } = params;
+
+    const escapar = (t: string) =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const subject = 'Restablece tu contraseña - VCM FCI-UCM';
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#F4F6F8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F8;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color:#1B3D8C;padding:24px 32px;">
+              <p style="margin:0;color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:0.5px;">VCM FCI · UCM</p>
+              <p style="margin:4px 0 0;color:#A5B8E8;font-size:13px;">Vinculación con el Medio — Facultad de Ciencias de la Ingeniería</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px;color:#1F2937;font-size:16px;">Hola, <strong>${escapar(nombre)}</strong>:</p>
+              <p style="margin:0 0 24px;color:#1F2937;font-size:15px;line-height:1.6;">
+                Recibimos una solicitud para restablecer la contraseña de tu cuenta. Haz clic en el botón para elegir una nueva. El enlace es válido por <strong>${minutos} minutos</strong> y solo se puede usar una vez.
+              </p>
+              <p style="margin:0 0 24px;text-align:center;">
+                <a href="${escapar(enlace)}" style="display:inline-block;background-color:#29ABE2;color:#FFFFFF;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">Restablecer contraseña</a>
+              </p>
+              <p style="margin:0 0 8px;color:#6B7280;font-size:13px;line-height:1.5;">Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+              <p style="margin:0 0 24px;color:#1B3D8C;font-size:12px;word-break:break-all;">${escapar(enlace)}</p>
+              <p style="margin:0 0 16px;color:#6B7280;font-size:13px;line-height:1.5;">Si tú no hiciste esta solicitud, ignora este correo: tu contraseña seguirá siendo la misma.</p>
+              <p style="margin:0;color:#1F2937;font-size:15px;">Saludos cordiales,<br><strong>Equipo VCM FCI · UCM</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#F4F6F8;padding:16px 32px;border-top:1px solid #E5E7EB;">
+              <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center;">Este es un correo automático, por favor no responder.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const { error } = await this.resend.emails.send({ from: this.fromEmail, to, subject, html });
+    if (error) {
+      console.error('[MailService] Error al enviar correo de recuperación de contraseña:', error);
+    }
+  }
 }
