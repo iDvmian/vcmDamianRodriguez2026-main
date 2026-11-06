@@ -4,6 +4,17 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../core/models/user.model';
 
+/** Nombre legible de cada rol, para mostrarlo junto al usuario en sesión. */
+const ROL_ETIQUETA: Record<string, string> = {
+  ADMIN: 'Administrador',
+  GESTOR_VCM: 'Gestor VCM',
+  ENCARGADO_CARRERA: 'Encargado de Carrera',
+  DOCENTE: 'Docente',
+  DECANO: 'Decano',
+  DIRECTOR_VCM: 'Director VCM',
+  CLIENTE: 'Solicitante',
+};
+
 @Component({
   selector: 'app-navbar',
   standalone: true,
@@ -16,6 +27,12 @@ export class NavbarComponent {
 
   get currentUser(): User | null {
     return this.authService.getCurrentUser();
+  }
+
+  /** Rol del usuario en sesión, en texto legible (ej: "Decano"). */
+  get rolLabel(): string {
+    const rol = this.currentUser?.rol ?? '';
+    return ROL_ETIQUETA[rol] ?? rol;
   }
 
   /** Decano, Director de VCM y Admin ven el panel de indicadores; el resto, su pantalla de inicio. */

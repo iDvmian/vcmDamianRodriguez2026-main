@@ -42,6 +42,7 @@
     <a routerLink="/perfil" routerLinkActive="navbar__profile--active" class="navbar__profile" title="Mi perfil">
       <i class="ti ti-user-circle"></i>
       <span>{{ currentUser?.nombres }} {{ currentUser?.apellidos }}</span>
+      <span class="navbar__rol" [attr.data-rol]="currentUser?.rol">{{ rolLabel }}</span>
     </a>
     <button class="navbar__logout" (click)="logout()">
       <i class="ti ti-logout"></i>
