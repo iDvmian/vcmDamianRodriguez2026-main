@@ -25,6 +25,21 @@ const AMARILLO = '#F59E0B';
 const ROJO = '#EF4444';
 const GRIS = '#9CA3AF';
 
+type HitoClave = 'todos' | 'solicitudes' | 'solicitudesAprobadas' | 'planteamientosAprobados' | 'proyectosCreados' | 'proyectosFinalizados';
+type AgrupacionHitos = 'mes' | 'trimestre' | 'anio';
+
+/** Hitos del seguimiento: clave en los datos, nombre y color de su serie. */
+const HITOS: { clave: Exclude<HitoClave, 'todos'>; label: string; color: string }[] = [
+  { clave: 'solicitudes', label: 'Solicitudes recibidas', color: CELESTE },
+  { clave: 'solicitudesAprobadas', label: 'Solicitudes aprobadas', color: TEAL },
+  { clave: 'planteamientosAprobados', label: 'Planteamientos aprobados', color: AMARILLO },
+  { clave: 'proyectosCreados', label: 'Proyectos creados', color: AZUL },
+  { clave: 'proyectosFinalizados', label: 'Proyectos finalizados', color: VERDE },
+];
+
+/** Máximo de meses que muestra el gráfico de hitos en la vista mensual (los más recientes). */
+const MAX_MESES_HITOS = 20;
+
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 @Component({
@@ -276,6 +291,40 @@ export class DashboardComponent implements OnInit {
   readonly optsBarra = this.baseOptions(true);
   readonly optsBarraH = { ...this.baseOptions(false), indexAxis: 'y' as const };
 
+  /** Opciones del gráfico "Por tipo de intervención": barras horizontales con espacio, leyenda arriba y todos los nombres visibles. */
+  readonly optsTipo = {
+    indexAxis: 'y' as const,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 6, right: 40 } },
+    // Separación entre grupos y entre las dos barras de cada tipo
+    datasets: { bar: { categoryPercentage: 0.72, barPercentage: 0.88, borderRadius: 3 } },
+    plugins: {
+      legend: { display: true, position: 'top' as const, align: 'end' as const, labels: { usePointStyle: true } },
+      tooltip: {
+        callbacks: {
+          // Qué parte de los planteamientos de ese tipo llegó a ser proyecto
+          afterBody: (items: any[]) => {
+            const it = items[0];
+            const plant = Number(it.chart.data.datasets[0].data[it.dataIndex]) || 0;
+            const proy = Number(it.chart.data.datasets[1].data[it.dataIndex]) || 0;
+            return plant ? `Conversión a proyecto: ${DashboardComponent.fmtPct((proy / plant) * 100)}` : '';
+          },
+        },
+      },
+    },
+    scales: {
+      x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#EEF1F5' } },
+      // autoSkip: false evita que Chart.js oculte nombres cuando hay muchos tipos
+      y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 13 }, padding: 8 } },
+    },
+  };
+
+  /** Alto del gráfico por tipo: crece con la cantidad de tipos para que las barras no queden apretadas. */
+  get alturaTipo(): number {
+    const n = this.chartTipo?.labels?.length ?? 0;
+    return Math.max(280, n * 62 + 80);
+  }
+
   ngOnInit(): void {
     if (this.esCliente) {
       this.leerAlertasCerradas();
@@ -311,6 +360,8 @@ export class DashboardComponent implements OnInit {
   private baseOptions(legend: boolean) {
     return {
       maintainAspectRatio: false,
+      // Espacio para que las etiquetas al final de las barras no se corten
+      layout: { padding: { top: 20, right: 36 } },
       plugins: { legend: { display: legend, position: 'bottom' as const, labels: { usePointStyle: true } } },
       scales: {
         x: { ticks: { precision: 0 }, grid: { display: false } },
@@ -452,22 +503,39 @@ export class DashboardComponent implements OnInit {
     };
   }
 
-  /** Cuando se muestra una sola etapa, escribe el valor sobre cada barra. */
-  readonly pluginsFacultad = [
+  /**
+   * Escribe el valor al final de cada barra (a la derecha en las horizontales, arriba en las verticales),
+   * para no depender de leer el eje. Un dataset puede traer `sufijo` (ej: '%') para agregarlo al número.
+   */
+  readonly pluginsBarras = [
     {
-      id: 'valoresFacultad',
+      id: 'valoresBarras',
       afterDatasetsDraw: (chart: any) => {
-        if (chart.data.datasets.length !== 1) return;
         const ctx = chart.ctx;
-        chart.getDatasetMeta(0).data.forEach((barra: any, i: number) => {
-          const valor = Number(chart.data.datasets[0].data[i]) || 0;
-          ctx.save();
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.font = '600 12px sans-serif';
-          ctx.fillStyle = '#374151';
-          ctx.fillText(String(valor), barra.x, barra.y - 4);
-          ctx.restore();
+        const horizontal = chart.options.indexAxis === 'y';
+        const varias = chart.data.datasets.length > 1;
+        chart.data.datasets.forEach((ds: any, k: number) => {
+          if (!chart.isDatasetVisible(k)) return;
+          chart.getDatasetMeta(k).data.forEach((barra: any, i: number) => {
+            const valor = Number(ds.data[i]);
+            if (!valor) return;
+            const texto = valor.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + (ds.sufijo ?? '');
+            ctx.save();
+            ctx.font = `600 ${varias ? 10 : 12}px sans-serif`;
+            ctx.fillStyle = '#374151';
+            if (horizontal) {
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(texto, barra.x + 6, barra.y);
+            } else {
+              // Con varias series, si el número no cabe sobre la barra se omite (queda en el tooltip)
+              if (varias && ctx.measureText(texto).width > barra.width + 4) { ctx.restore(); return; }
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillText(texto, barra.x, barra.y - 4);
+            }
+            ctx.restore();
+          });
         });
       },
     },
@@ -496,11 +564,15 @@ export class DashboardComponent implements OnInit {
       datasets: [{ data: [r.proyectos.enProceso, r.proyectos.pausados, r.proyectos.finalizados, r.proyectos.cancelados], backgroundColor: [CELESTE, AMARILLO, VERDE, GRIS] }],
     };
 
+    // De mayor a menor, para que se lea como un ranking
+    const tipos = [...d.porTipoIntervencion].sort(
+      (a, b) => b.planteamientos - a.planteamientos || b.proyectos - a.proyectos,
+    );
     this.chartTipo = {
-      labels: d.porTipoIntervencion.map((t) => this.tipoLabel(t.tipo)),
+      labels: tipos.map((t) => this.tipoLabel(t.tipo)),
       datasets: [
-        { label: 'Planteamientos', data: d.porTipoIntervencion.map((t) => t.planteamientos), backgroundColor: CELESTE },
-        { label: 'Proyectos', data: d.porTipoIntervencion.map((t) => t.proyectos), backgroundColor: AZUL },
+        { label: 'Planteamientos', data: tipos.map((t) => t.planteamientos), backgroundColor: CELESTE },
+        { label: 'Proyectos', data: tipos.map((t) => t.proyectos), backgroundColor: AZUL },
       ],
     };
 
@@ -538,6 +610,7 @@ export class DashboardComponent implements OnInit {
       labels: s.tiempos.map((t) => `${t.label} (${t.casos} casos)`),
       datasets: [{
         label: 'Días promedio',
+        sufijo: ' d',
         data: s.tiempos.map((t) => t.promedioDias ?? 0),
         backgroundColor: [CELESTE, TEAL, AMARILLO, VERDE, AZUL, GRIS],
       }],
@@ -547,22 +620,110 @@ export class DashboardComponent implements OnInit {
       labels: ['Solicitudes', 'Planteamientos'],
       datasets: [{
         label: '% de rechazo',
+        sufijo: '%',
         data: [s.rechazos.solicitud.pctRechazo, s.rechazos.planteamiento.pctRechazo],
         backgroundColor: [ROJO, AMARILLO],
       }],
     };
 
+    this.armarChartHitos(s);
+  }
+
+  // ── Gráfico "Hitos por mes": hito elegido y agrupación (mes / trimestre / año) ─────────────────
+  hitoSeleccionado: HitoClave = 'todos';
+  agrupacionHitos: AgrupacionHitos = 'mes';
+
+  readonly opcionesHito: { label: string; value: HitoClave }[] = [
+    { label: 'Todos los hitos', value: 'todos' },
+    ...HITOS.map((h) => ({ label: h.label, value: h.clave })),
+  ];
+  readonly agrupacionesHitos: { valor: AgrupacionHitos; label: string }[] = [
+    { valor: 'mes', label: 'Mensual' },
+    { valor: 'trimestre', label: 'Trimestral' },
+    { valor: 'anio', label: 'Anual' },
+  ];
+
+  /** Título del gráfico según la agrupación y el hito elegidos. */
+  get tituloHitos(): string {
+    const periodo = { mes: 'mes', trimestre: 'trimestre', anio: 'año' }[this.agrupacionHitos];
+    const hito = HITOS.find((h) => h.clave === this.hitoSeleccionado);
+    const limite = this.agrupacionHitos === 'mes' ? ` (últimos ${MAX_MESES_HITOS})` : '';
+    return `Hitos por ${periodo}${limite}` + (hito ? ` — ${hito.label}` : '');
+  }
+
+  cambiarHito(hito: HitoClave): void {
+    this.hitoSeleccionado = hito;
+    this.rearmarHitos();
+  }
+
+  cambiarAgrupacionHitos(agrupacion: AgrupacionHitos): void {
+    this.agrupacionHitos = agrupacion;
+    this.rearmarHitos();
+  }
+
+  private rearmarHitos(): void {
+    if (this.data?.seguimiento) this.armarChartHitos(this.data.seguimiento);
+  }
+
+  /** Suma los hitos mensuales en el período elegido (mes, trimestre o año), en orden cronológico. */
+  private armarChartHitos(s: NonNullable<Dashboard['seguimiento']>): void {
+    const grupos = new Map<string, Record<Exclude<HitoClave, 'todos'>, number>>();
+    for (const m of s.hitosPorMes) {
+      const [anio, mes] = m.mes.split('-');
+      const clave =
+        this.agrupacionHitos === 'mes' ? m.mes
+        : this.agrupacionHitos === 'trimestre' ? `${anio}-T${Math.ceil(Number(mes) / 3)}`
+        : anio;
+      const g = grupos.get(clave) ?? {
+        solicitudes: 0, solicitudesAprobadas: 0, planteamientosAprobados: 0, proyectosCreados: 0, proyectosFinalizados: 0,
+      };
+      for (const h of HITOS) g[h.clave] += Number(m[h.clave]) || 0;
+      grupos.set(clave, g);
+    }
+    // En la vista mensual se muestran solo los últimos meses, para que el gráfico se pueda leer
+    const todas = [...grupos.keys()].sort();
+    const claves = this.agrupacionHitos === 'mes' ? todas.slice(-MAX_MESES_HITOS) : todas;
+    const etiqueta = (k: string) =>
+      this.agrupacionHitos === 'mes' ? this.mesLabel(k)
+      : this.agrupacionHitos === 'trimestre' ? `${k.split('-T')[1]}º trim. ${k.split('-T')[0]}`
+      : k;
+    const elegidos = HITOS.filter((h) => this.hitoSeleccionado === 'todos' || h.clave === this.hitoSeleccionado);
+
     this.chartHitos = {
-      labels: s.hitosPorMes.map((m) => this.mesLabel(m.mes)),
-      datasets: [
-        { label: 'Solicitudes recibidas', data: s.hitosPorMes.map((m) => m.solicitudes), borderColor: CELESTE, backgroundColor: CELESTE, tension: 0.3 },
-        { label: 'Solicitudes aprobadas', data: s.hitosPorMes.map((m) => m.solicitudesAprobadas), borderColor: TEAL, backgroundColor: TEAL, tension: 0.3 },
-        { label: 'Planteamientos aprobados', data: s.hitosPorMes.map((m) => m.planteamientosAprobados), borderColor: AMARILLO, backgroundColor: AMARILLO, tension: 0.3 },
-        { label: 'Proyectos creados', data: s.hitosPorMes.map((m) => m.proyectosCreados), borderColor: AZUL, backgroundColor: AZUL, tension: 0.3 },
-        { label: 'Proyectos finalizados', data: s.hitosPorMes.map((m) => m.proyectosFinalizados), borderColor: VERDE, backgroundColor: VERDE, tension: 0.3 },
-      ],
+      labels: claves.map(etiqueta),
+      datasets: elegidos.map((h) => ({
+        label: h.label,
+        data: claves.map((k) => grupos.get(k)![h.clave]),
+        borderColor: h.color,
+        backgroundColor: h.color,
+        tension: 0.3,
+      })),
     };
   }
+
+  /** Con un solo hito elegido, escribe el valor sobre cada punto (y salta algunos si son muchos puntos). */
+  readonly pluginsHitos = [
+    {
+      id: 'valoresHitos',
+      afterDatasetsDraw: (chart: any) => {
+        if (chart.data.datasets.length !== 1) return;
+        const ctx = chart.ctx;
+        const puntos = chart.getDatasetMeta(0).data;
+        const paso = Math.max(1, Math.ceil(puntos.length / 20));
+        puntos.forEach((p: any, i: number) => {
+          if (i % paso !== 0) return;
+          const valor = Number(chart.data.datasets[0].data[i]) || 0;
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.font = '600 11px sans-serif';
+          ctx.fillStyle = '#374151';
+          ctx.fillText(String(valor), p.x, p.y - 6);
+          ctx.restore();
+        });
+      },
+    },
+  ];
 
   fmt(n: number | null | undefined, sufijo = ''): string {
     return n === null || n === undefined ? '—' : `${n.toLocaleString('es-CL')}${sufijo}`;

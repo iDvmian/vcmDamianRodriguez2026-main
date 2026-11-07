@@ -129,6 +129,10 @@
 
   &__title { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--ucm-azul); }
   &__body { height: 280px; position: relative; }
+
+  // Para gráficos con alto propio: el lienzo de Chart.js ocupa todo el alto de la caja
+  &__body--fill ::ng-deep p-chart,
+  &__body--fill ::ng-deep p-chart > div { display: block; height: 100%; }
 }
 
 .tables {
@@ -168,7 +172,16 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
+}
+
+// Controles de un gráfico (selector, agrupación, imprimir) en una sola fila
+.chart-card__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-print {

@@ -179,7 +179,7 @@
                       (click)="cambiarVistaFacultad(v.valor)">{{ v.label }}</button>
             </div>
           </div>
-          <div class="chart-card__body"><p-chart type="bar" [data]="chartFacultad" [options]="optsBarra" [plugins]="pluginsFacultad" /></div>
+          <div class="chart-card__body"><p-chart type="bar" [data]="chartFacultad" [options]="optsBarra" [plugins]="pluginsBarras" /></div>
         </article>
         <article class="table-card chart-card--wide">
           <div class="chart-card__head">
@@ -240,15 +240,15 @@
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por tipo de intervención</h2>
-            <div class="chart-card__body"><p-chart type="bar" [data]="chartTipo" [options]="optsBarraH" /></div>
+            <div class="chart-card__body chart-card__body--fill" [style.height.px]="alturaTipo"><p-chart type="bar" [data]="chartTipo" [options]="optsTipo" [plugins]="pluginsBarras" /></div>
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por carrera</h2>
-            <div class="chart-card__body"><p-chart type="bar" [data]="chartCarrera" [options]="optsBarra" /></div>
+            <div class="chart-card__body"><p-chart type="bar" [data]="chartCarrera" [options]="optsBarra" [plugins]="pluginsBarras" /></div>
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Solicitudes por comuna (top 10)</h2>
-            <div class="chart-card__body"><p-chart type="bar" [data]="chartComuna" [options]="optsBarraH" /></div>
+            <div class="chart-card__body"><p-chart type="bar" [data]="chartComuna" [options]="optsBarraH" [plugins]="pluginsBarras" /></div>
           </article>
         </section>
 
@@ -261,7 +261,7 @@
           <section class="charts">
             <article class="chart-card chart-card--wide">
               <h2 class="chart-card__title">Embudo de la iniciativa</h2>
-              <div class="chart-card__body"><p-chart type="bar" [data]="chartEmbudo" [options]="optsBarraH" /></div>
+              <div class="chart-card__body"><p-chart type="bar" [data]="chartEmbudo" [options]="optsBarraH" [plugins]="pluginsBarras" /></div>
               <div class="embudo">
                 <span *ngFor="let p of seg.embudo; let i = index" class="embudo__item">
                   {{ p.label }}: <strong>{{ p.pctDelTotal }}%</strong>
@@ -271,12 +271,12 @@
             </article>
             <article class="chart-card">
               <h2 class="chart-card__title">Tiempo promedio por fase (días)</h2>
-              <div class="chart-card__body"><p-chart type="bar" [data]="chartTiempos" [options]="optsBarraH" /></div>
+              <div class="chart-card__body"><p-chart type="bar" [data]="chartTiempos" [options]="optsBarraH" [plugins]="pluginsBarras" /></div>
               <p class="seccion__hint">Solo incluye hitos con fecha registrada; los reconstruidos se omiten.</p>
             </article>
             <article class="chart-card">
               <h2 class="chart-card__title">Rechazo por etapa (%)</h2>
-              <div class="chart-card__body"><p-chart type="bar" [data]="chartRechazo" [options]="optsBarra" /></div>
+              <div class="chart-card__body"><p-chart type="bar" [data]="chartRechazo" [options]="optsBarra" [plugins]="pluginsBarras" /></div>
               <p class="seccion__hint">
                 Solicitudes: {{ seg.rechazos.solicitud.rechazadas }} de {{ seg.rechazos.solicitud.evaluadas }} evaluadas.
                 Planteamientos: {{ seg.rechazos.planteamiento.rechazados }} de {{ seg.rechazos.planteamiento.evaluados }} evaluados
@@ -284,8 +284,30 @@
               </p>
             </article>
             <article class="chart-card chart-card--wide">
-              <h2 class="chart-card__title">Hitos por mes</h2>
-              <div class="chart-card__body"><p-chart type="line" [data]="chartHitos" [options]="optsLinea" /></div>
+              <div class="chart-card__head">
+                <h2 class="chart-card__title">{{ tituloHitos }}</h2>
+                <div class="chart-card__tools">
+                  <p-select
+                    [options]="opcionesHito"
+                    [ngModel]="hitoSeleccionado"
+                    (ngModelChange)="cambiarHito($event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    [style]="{ minWidth: '13rem' }"
+                  />
+                  <div class="vista" role="group" aria-label="Agrupar hitos por período">
+                    <button *ngFor="let a of agrupacionesHitos" type="button" class="vista__btn"
+                            [class.vista__btn--activa]="agrupacionHitos === a.valor"
+                            [attr.aria-pressed]="agrupacionHitos === a.valor"
+                            (click)="cambiarAgrupacionHitos(a.valor)">{{ a.label }}</button>
+                  </div>
+                  <button type="button" class="btn-print" title="Imprimir este gráfico" (click)="imprimirGrafico($event, tituloHitos)">
+                    <i class="ti ti-printer"></i> Imprimir
+                  </button>
+                </div>
+              </div>
+              <div class="chart-card__body"><p-chart type="line" [data]="chartHitos" [options]="optsLinea" [plugins]="pluginsHitos" /></div>
             </article>
           </section>
 
