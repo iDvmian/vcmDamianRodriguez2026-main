@@ -16,7 +16,9 @@ import { SolicitudesService, CreateSolicitudDto, UpdateSolicitudDto, GestionarSo
 import { CarrerasService } from '../../core/services/carreras.service';
 import { UsuariosService } from '../../core/services/usuarios.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Solicitud, EstadoSolicitud, TIPO_CLIENTE_LABELS, TipoCliente } from '../../core/models/solicitud.model';
+import { Solicitud, EstadoSolicitud, TIPO_CLIENTE_LABELS, TipoCliente, ALCANCE_OPCIONES } from '../../core/models/solicitud.model';
+import { REGIONES_FUERA_DEL_MAULE } from '../../core/constants/regiones-chile';
+import { COMUNAS_POR_REGION } from '../../core/constants/comunas-chile';
 import { COMUNAS_MAULE } from '../../core/constants/comunas-maule';
 
 
@@ -118,6 +120,8 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     group.get('carreraId')!.setValue(null);
   }
   readonly comunasMaule = COMUNAS_MAULE;
+  readonly regionesChile = REGIONES_FUERA_DEL_MAULE;
+  readonly alcances = ALCANCE_OPCIONES;
 
   readonly ordenOptions = [
     { label: 'Más recientes primero', value: 'recientes' },
@@ -220,7 +224,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form = this.fb.group({
       titulo: ['', [Validators.required, Validators.maxLength(140)]],
       descripcion: ['', [Validators.required, Validators.maxLength(560)]],
+      alcance: ['REGIONAL', Validators.required],
       ciudad: [null, Validators.required],
+      region: [null],
+      pais: ['', Validators.maxLength(100)],
       direccion: ['', [Validators.required, Validators.maxLength(150)]],
       numeroDireccion: ['', Validators.maxLength(10)],
       telefono: ['', [Validators.required, Validators.pattern(/^\+?[\d\s]{8,20}$/)]],
@@ -233,6 +240,9 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     });
 
     // Si elige "Otro", debe escribir qué tipo de cliente es
+    // Los campos de ubicación obligatorios dependen del alcance elegido
+    this.form.get('alcance')!.valueChanges.subscribe(() => this.aplicarValidacionAlcance());
+
     this.form.get('tipoCliente')!.valueChanges.subscribe((tipo) => {
       const otro = this.form.get('tipoClienteOtro')!;
       if (tipo === 'OTRO') {
@@ -490,7 +500,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
+      alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
+      region: item.region ?? null,
+      pais: item.pais ?? '',
       direccion: item.direccion ?? '',
       numeroDireccion: item.numeroDireccion ?? '',
       telefono: item.telefono ?? '',
@@ -501,6 +514,48 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       facultadId: this.carrerasDropdown.find(c => c.id === item.carreraId)?.facultadId ?? null,
       carreraId: item.carreraId ?? null,
     });
+  }
+
+  get alcanceForm(): string { return this.form.get('alcance')?.value ?? 'REGIONAL'; }
+
+  /** Qué campos de ubicación se piden (y cuáles son obligatorios) según el alcance. */
+  private aplicarValidacionAlcance(): void {
+    const a = this.alcanceForm;
+    const poner = (campo: string, validators: any[]) => {
+      const c = this.form.get(campo)!;
+      c.setValidators(validators);
+      c.updateValueAndValidity({ emitEvent: false });
+    };
+    poner('ciudad', a === 'REGIONAL' || a === 'NACIONAL' ? [Validators.required] : [Validators.maxLength(100)]);
+    poner('region', a === 'NACIONAL' ? [Validators.required] : []);
+    poner('pais', a === 'INTERNACIONAL' ? [Validators.required, Validators.pattern(/\S/), Validators.maxLength(100)] : [Validators.maxLength(100)]);
+    poner('direccion', a === 'REGIONAL' ? [Validators.required, Validators.maxLength(150)] : [Validators.maxLength(150)]);
+  }
+
+  /** Comunas de la región elegida (alcance nacional). */
+  get comunasDeRegion(): string[] {
+    const region = this.form.get('region')?.value;
+    return region ? COMUNAS_POR_REGION[region] ?? [] : [];
+  }
+
+  /** Al cambiar de región se limpia la comuna, que pertenecía a la anterior. */
+  cambiarRegion(): void {
+    this.form.patchValue({ ciudad: null });
+  }
+
+  /** Al cambiar de alcance se limpian los datos de ubicación que ya no corresponden. */
+  cambiarAlcance(): void {
+    this.form.patchValue({ ciudad: null, region: null, pais: '' });
+    this.aplicarValidacionAlcance();
+  }
+
+  /** Texto de lugar para el listado: ciudad, región o país según el alcance. */
+  lugar(s: Solicitud): string {
+    switch (s.alcance) {
+      case 'INTERNACIONAL': return [s.ciudad, s.pais].filter(Boolean).join(', ') || '—';
+      case 'NACIONAL': return [s.ciudad, s.region].filter(Boolean).join(', ') || '—';
+      default: return s.ciudad || '—';
+    }
   }
 
   /** La organización es obligatoria solo en iniciativas de docente. */
@@ -520,7 +575,8 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.evaluando = false;
     this.editingItem = null;
     this.viewOnly = false;
-    this.form.reset({ tipoClienteOtro: '', nombreOrganizacion: '', telefono: this.telefonoPerfil });
+    this.form.reset({ alcance: 'REGIONAL', tipoClienteOtro: '', nombreOrganizacion: '', telefono: this.telefonoPerfil, pais: '' });
+    this.aplicarValidacionAlcance();
     this.form.enable();
     this.aplicarValidacionIniciativa();
     this.dialogVisible = true;
@@ -534,7 +590,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
+      alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
+      region: item.region ?? null,
+      pais: item.pais ?? '',
       direccion: item.direccion ?? '',
       numeroDireccion: item.numeroDireccion ?? '',
       telefono: item.telefono ?? '',
@@ -568,8 +627,11 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: UpdateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
-        ciudad: raw.ciudad,
-        direccion: raw.direccion.trim(),
+        alcance: raw.alcance,
+        ciudad: raw.ciudad || null,
+        region: raw.region || null,
+        pais: raw.pais?.trim() || null,
+        direccion: raw.direccion?.trim() || null,
         numeroDireccion: raw.numeroDireccion?.trim() || null,
         telefono: raw.telefono.trim(),
         tipoCliente: raw.tipoCliente,
@@ -588,8 +650,11 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: CreateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
-        ciudad: raw.ciudad,
-        direccion: raw.direccion.trim(),
+        alcance: raw.alcance,
+        ciudad: raw.ciudad || null,
+        region: raw.region || null,
+        pais: raw.pais?.trim() || null,
+        direccion: raw.direccion?.trim() || null,
         numeroDireccion: raw.numeroDireccion?.trim() || undefined,
         telefono: raw.telefono.trim(),
         tipoCliente: raw.tipoCliente,
@@ -724,7 +789,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
         this.form.patchValue({
           titulo: actual.titulo,
           descripcion: actual.descripcion,
+          alcance: actual.alcance ?? 'REGIONAL',
           ciudad: actual.ciudad ?? null,
+          region: actual.region ?? null,
+          pais: actual.pais ?? '',
           direccion: actual.direccion ?? '',
           numeroDireccion: actual.numeroDireccion ?? '',
           telefono: actual.telefono ?? '',

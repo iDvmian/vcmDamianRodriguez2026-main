@@ -5,9 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoSolicitud, EtapaSeguimiento, OrigenSolicitud, Role } from '@prisma/client';
+import { AlcanceVinculacion, EstadoSolicitud, EtapaSeguimiento, OrigenSolicitud, Role } from '@prisma/client';
 import { registrarEtapa } from '../common/seguimiento';
 import { facultadDelDecano } from '../common/alcance';
+import { COMUNAS_MAULE } from '../common/constants/comunas-maule';
+import { COMUNAS_POR_REGION } from '../common/constants/comunas-chile';
+import { REGIONES_FUERA_DEL_MAULE } from '../common/constants/regiones-chile';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -239,6 +242,50 @@ export class SolicitudesService {
     return { data: solicitud, message: 'Solicitud obtenida exitosamente', statusCode: 200 };
   }
 
+  /**
+   * Valida y normaliza la ubicación según el alcance de la vinculación:
+   * REGIONAL (comuna de la región del Maule + dirección), NACIONAL (comuna de otra región de Chile)
+   * e INTERNACIONAL (país).
+   */
+  private normalizarUbicacion(u: {
+    alcance: AlcanceVinculacion;
+    ciudad?: string | null;
+    direccion?: string | null;
+    region?: string | null;
+    pais?: string | null;
+  }) {
+    const limpiar = (v?: string | null) => v?.trim() || null;
+    const ciudad = limpiar(u.ciudad);
+    const direccion = limpiar(u.direccion);
+    const region = limpiar(u.region);
+    const pais = limpiar(u.pais);
+
+    switch (u.alcance) {
+      case AlcanceVinculacion.REGIONAL:
+        if (!ciudad || !COMUNAS_MAULE.includes(ciudad)) {
+          throw new BadRequestException('En una vinculación regional, la ciudad debe ser una comuna de la región del Maule');
+        }
+        if (!direccion) throw new BadRequestException('La dirección es requerida en una vinculación regional');
+        return { alcance: u.alcance, ciudad, direccion, region: 'Maule', pais: 'Chile' };
+
+      case AlcanceVinculacion.NACIONAL:
+        if (!region || !REGIONES_FUERA_DEL_MAULE.includes(region)) {
+          throw new BadRequestException('En una vinculación nacional, elige una región de Chile distinta del Maule');
+        }
+        if (!ciudad || !COMUNAS_POR_REGION[region]?.includes(ciudad)) {
+          throw new BadRequestException(`En una vinculación nacional, la ciudad debe ser una comuna de la región ${region}`);
+        }
+        return { alcance: u.alcance, ciudad, direccion, region, pais: 'Chile' };
+
+      case AlcanceVinculacion.INTERNACIONAL:
+        if (!pais) throw new BadRequestException('En una vinculación internacional, indica el país');
+        return { alcance: u.alcance, ciudad, direccion, region: null, pais };
+
+      default:
+        throw new BadRequestException('Alcance inválido');
+    }
+  }
+
   async create(dto: CreateSolicitudDto, currentUser: CurrentUser) {
     const clienteId = currentUser.id;
     const esDocente = currentUser.rol === Role.DOCENTE;
@@ -259,12 +306,13 @@ export class SolicitudesService {
       if (!carrera) throw new NotFoundException('Carrera no encontrada');
     }
 
+    const ubicacion = this.normalizarUbicacion(dto);
+
     const solicitud = await this.prisma.solicitud.create({
       data: {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
-        ciudad: dto.ciudad,        
-        direccion: dto.direccion,
+        ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,
         tipoCliente: dto.tipoCliente,
@@ -308,13 +356,24 @@ export class SolicitudesService {
       throw new BadRequestException('Indica la organización o grupo con el que trabajarás');
     }
 
+    // Si se toca algún dato de ubicación, se revalida todo junto con lo que ya tenía la solicitud
+    const cambiaUbicacion = [dto.alcance, dto.ciudad, dto.region, dto.pais, dto.direccion].some((v) => v !== undefined);
+    const ubicacion = cambiaUbicacion
+      ? this.normalizarUbicacion({
+          alcance: dto.alcance ?? solicitud.alcance,
+          ciudad: dto.ciudad !== undefined ? dto.ciudad : solicitud.ciudad,
+          direccion: dto.direccion !== undefined ? dto.direccion : solicitud.direccion,
+          region: dto.region !== undefined ? dto.region : solicitud.region,
+          pais: dto.pais !== undefined ? dto.pais : solicitud.pais,
+        })
+      : {};
+
     const updated = await this.prisma.solicitud.update({
       where: { id },
       data: {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
-        ciudad: dto.ciudad,
-        direccion: dto.direccion,
+        ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,
         tipoCliente: dto.tipoCliente,

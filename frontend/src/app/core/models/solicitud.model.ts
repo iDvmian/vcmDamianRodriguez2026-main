@@ -2,6 +2,19 @@ import { Carrera } from './carrera.model';
 
 export type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
 
+export type AlcanceVinculacion = 'REGIONAL' | 'NACIONAL' | 'INTERNACIONAL';
+
+export const ALCANCE_LABELS: Record<AlcanceVinculacion, string> = {
+  REGIONAL: 'Regional (región del Maule)',
+  NACIONAL: 'Nacional (otra región de Chile)',
+  INTERNACIONAL: 'Internacional',
+};
+
+export const ALCANCE_OPCIONES = (Object.keys(ALCANCE_LABELS) as AlcanceVinculacion[]).map((value) => ({
+  value,
+  label: ALCANCE_LABELS[value],
+}));
+
 export type OrigenSolicitud = 'EXTERNA' | 'DOCENTE';
 
 export type TipoCliente =
@@ -30,8 +43,11 @@ export interface Solicitud {
   id: number;
   titulo: string;
   descripcion: string;
-  ciudad?: string;
-  direccion?: string;
+  alcance?: AlcanceVinculacion;
+  ciudad?: string | null;
+  region?: string | null;
+  pais?: string | null;
+  direccion?: string | null;
   numeroDireccion?: string;
   telefono?: string | null;
   estado: EstadoSolicitud;

@@ -166,7 +166,7 @@
           <th class="col-titulo">Solicitudes</th>
           <th class="col-estado">Estado</th>
           <th class="col-carrera">Carrera</th>
-          <th class="col-ciudad">Ciudad</th>
+          <th class="col-ciudad">Lugar</th>
           <th *ngIf="useAllEndpoint" class="col-cliente">Solicitante</th>
           <th class="col-fecha">Fecha</th>
           <th class="col-actions">Acciones</th>
@@ -187,7 +187,7 @@
             />
             <span *ngIf="!sol.carrera" class="text-muted">—</span>
           </td>
-          <td class="col-ciudad">{{ sol.ciudad || '—' }}</td>
+          <td class="col-ciudad">{{ lugar(sol) }}</td>
           <td *ngIf="useAllEndpoint" class="col-cliente" [title]="sol.cliente ? sol.cliente.nombres + ' ' + sol.cliente.apellidos : ''">
             {{ sol.cliente ? sol.cliente.nombres + ' ' + sol.cliente.apellidos : '—' }}
           </td>
@@ -376,8 +376,22 @@
 
 
       <h3 class="form-section field--full">Ubicación y contacto</h3>
-      <!-- Ciudad (solo comunas del Maule, con buscador) -->
+      <!-- Alcance de la vinculación -->
       <div class="field">
+        <label class="field__label">Alcance <span *ngIf="!viewOnly" class="required">*</span></label>
+        <p-select
+          formControlName="alcance"
+          [options]="alcances"
+          optionLabel="label"
+          optionValue="value"
+          (onChange)="cambiarAlcance()"
+          [style]="{ width: '100%' }"
+          appendTo="body"
+        />
+      </div>
+
+      <!-- Regional: comuna de la región del Maule, con buscador -->
+      <div class="field" *ngIf="alcanceForm === 'REGIONAL'">
         <label class="field__label">Ciudad <span *ngIf="!viewOnly" class="required">*</span></label>
         <p-select
           formControlName="ciudad"
@@ -395,9 +409,67 @@
         </small>
       </div>
 
+      <!-- Nacional: región de Chile -->
+      <div class="field" *ngIf="alcanceForm === 'NACIONAL'">
+        <label class="field__label">Región <span *ngIf="!viewOnly" class="required">*</span></label>
+        <p-select
+          formControlName="region"
+          [options]="regionesChile"
+          (onChange)="cambiarRegion()"
+          placeholder="Seleccione una región"
+          [filter]="true"
+          filterPlaceholder="Buscar región"
+          emptyFilterMessage="Sin resultados"
+          [style]="{ width: '100%' }"
+          [scrollHeight]="'250px'"
+          appendTo="body"
+        />
+        <small class="field__error" *ngIf="form.get('region')?.invalid && form.get('region')?.touched">
+          La región es requerida
+        </small>
+      </div>
+
+      <!-- Nacional: comuna de la región elegida, con buscador -->
+      <div class="field" *ngIf="alcanceForm === 'NACIONAL'">
+        <label class="field__label">Ciudad <span *ngIf="!viewOnly" class="required">*</span></label>
+        <p-select
+          formControlName="ciudad"
+          [options]="comunasDeRegion"
+          [placeholder]="form.get('region')?.value ? 'Seleccione una ciudad' : 'Primero elige una región'"
+          [filter]="true"
+          filterPlaceholder="Buscar ciudad"
+          emptyFilterMessage="Sin resultados"
+          [style]="{ width: '100%' }"
+          [scrollHeight]="'250px'"
+          appendTo="body"
+        />
+        <small class="field__error" *ngIf="form.get('ciudad')?.invalid && form.get('ciudad')?.touched">
+          La ciudad es requerida
+        </small>
+      </div>
+
+      <!-- Internacional: país -->
+      <div class="field" *ngIf="alcanceForm === 'INTERNACIONAL'">
+        <label class="field__label">País <span *ngIf="!viewOnly" class="required">*</span></label>
+        <input pInputText formControlName="pais" maxlength="100" placeholder="Ej: Argentina" class="field__input" />
+        <small class="field__error" *ngIf="form.get('pais')?.invalid && form.get('pais')?.touched">
+          El país es requerido
+        </small>
+      </div>
+
+      <!-- Internacional: ciudad escrita a mano (opcional) -->
+      <div class="field" *ngIf="alcanceForm === 'INTERNACIONAL'">
+        <label class="field__label">Ciudad <span class="field__hint field__hint--inline">(opcional)</span></label>
+        <input pInputText formControlName="ciudad" maxlength="100" placeholder="Ej: Mendoza" class="field__input" />
+      </div>
+
             <!-- Dirección -->
       <div class="field">
-        <label class="field__label">Dirección del lugar <span *ngIf="!viewOnly" class="required">*</span></label>
+        <label class="field__label">
+          Dirección del lugar
+          <span *ngIf="!viewOnly && alcanceForm === 'REGIONAL'" class="required">*</span>
+          <span *ngIf="alcanceForm !== 'REGIONAL'" class="field__hint field__hint--inline">(opcional)</span>
+        </label>
         <input
           pInputText
           formControlName="direccion"

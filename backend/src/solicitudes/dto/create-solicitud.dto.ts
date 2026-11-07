@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoCliente } from '@prisma/client';
-import { IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, ValidateIf } from 'class-validator';
-import { COMUNAS_MAULE } from '../../common/constants/comunas-maule';
+import { AlcanceVinculacion, TipoCliente } from '@prisma/client';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateSolicitudDto {
   @ApiProperty({ example: 'Capacitación en Excel para adultos mayores' })
@@ -16,17 +15,33 @@ export class CreateSolicitudDto {
   @MaxLength(560)
   descripcion: string;
 
-   @ApiProperty({ example: 'Talca', enum: COMUNAS_MAULE })
-  @IsString()
-  @IsNotEmpty()
-  @IsIn(COMUNAS_MAULE, { message: 'La ciudad debe ser una comuna de la región del Maule' })
-  ciudad: string;
+  @ApiProperty({ enum: AlcanceVinculacion, example: AlcanceVinculacion.LOCAL, description: 'Alcance territorial de la vinculación' })
+  @IsEnum(AlcanceVinculacion, { message: 'Alcance inválido' })
+  alcance: AlcanceVinculacion;
 
-  @ApiProperty({ example: 'Calle 1 Norte' })
+  @ApiPropertyOptional({ example: 'Talca', description: 'Local: comuna del Maule (obligatoria). Regional: comuna del Maule (opcional). Nacional/internacional: ciudad (opcional)' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
+  @MaxLength(100)
+  ciudad?: string | null;
+
+  @ApiPropertyOptional({ example: 'Biobío', description: 'Obligatoria cuando el alcance es NACIONAL' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  region?: string | null;
+
+  @ApiPropertyOptional({ example: 'Argentina', description: 'Obligatorio cuando el alcance es INTERNACIONAL' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  pais?: string | null;
+
+  @ApiPropertyOptional({ example: 'Calle 1 Norte', description: 'Obligatoria cuando el alcance es LOCAL' })
+  @IsOptional()
+  @IsString()
   @MaxLength(150)
-  direccion: string;
+  direccion?: string | null;
 
   @ApiPropertyOptional({ example: '1234' })
   @IsOptional()

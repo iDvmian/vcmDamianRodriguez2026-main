@@ -3,15 +3,18 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { Solicitud, EstadoSolicitud, TipoCliente } from '../models/solicitud.model';
+import { Solicitud, EstadoSolicitud, TipoCliente, AlcanceVinculacion } from '../models/solicitud.model';
 import { MiResumen } from '../models/mi-resumen.model';
 import { PaginatedResponse } from '../models/paginated-response.model';
 
 export interface CreateSolicitudDto {
   titulo: string;
   descripcion: string;
-  ciudad: string;
-  direccion: string;
+  alcance: AlcanceVinculacion;
+  ciudad?: string | null;
+  region?: string | null;
+  pais?: string | null;
+  direccion?: string | null;
   numeroDireccion?: string;
   telefono: string;
   tipoCliente: TipoCliente;
@@ -24,8 +27,11 @@ export interface CreateSolicitudDto {
 export interface UpdateSolicitudDto {
   titulo?: string;
   descripcion?: string;
-  ciudad?: string;
-  direccion?: string;
+  alcance?: AlcanceVinculacion;
+  ciudad?: string | null;
+  region?: string | null;
+  pais?: string | null;
+  direccion?: string | null;
   numeroDireccion?: string | null;
   telefono?: string;
   tipoCliente?: TipoCliente;

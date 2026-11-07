@@ -39,6 +39,13 @@ enum OrigenSolicitud {
   DOCENTE
 }
 
+/// Alcance territorial de la vinculación (Política de Vinculación con el Medio)
+enum AlcanceVinculacion {
+  REGIONAL
+  NACIONAL
+  INTERNACIONAL
+}
+
 enum TipoCliente {
   JUNTA_VECINOS
   ONG
@@ -167,7 +174,10 @@ model Solicitud {
   id          Int               @id @default(autoincrement())
   titulo      String
   descripcion String            @db.Text
-  ciudad      String?  
+  alcance     AlcanceVinculacion @default(REGIONAL)
+  ciudad      String?
+  region      String?           @db.VarChar(100)
+  pais        String?           @db.VarChar(100)
   direccion   String?
   numeroDireccion String?
   telefono    String?
