@@ -170,11 +170,24 @@
       <!-- Comparación entre facultades (Director y Admin): de lo general a lo específico -->
       <section class="charts" *ngIf="esGlobal && d.porFacultad.length">
         <article class="chart-card chart-card--wide">
-          <h2 class="chart-card__title">Comparación entre facultades</h2>
-          <div class="chart-card__body"><p-chart type="bar" [data]="chartFacultad" [options]="optsBarra" /></div>
+          <div class="chart-card__head">
+            <h2 class="chart-card__title">Comparación entre facultades</h2>
+            <div class="vista" role="group" aria-label="Proceso a comparar">
+              <button *ngFor="let v of vistasFacultad" type="button" class="vista__btn"
+                      [class.vista__btn--activa]="vistaFacultad === v.valor"
+                      [attr.aria-pressed]="vistaFacultad === v.valor"
+                      (click)="cambiarVistaFacultad(v.valor)">{{ v.label }}</button>
+            </div>
+          </div>
+          <div class="chart-card__body"><p-chart type="bar" [data]="chartFacultad" [options]="optsBarra" [plugins]="pluginsFacultad" /></div>
         </article>
         <article class="table-card chart-card--wide">
-          <h2 class="chart-card__title">Detalle por facultad</h2>
+          <div class="chart-card__head">
+            <h2 class="chart-card__title">Detalle por facultad</h2>
+            <button type="button" class="btn-print" title="Imprimir esta tabla" (click)="imprimirTabla($event, 'Detalle por facultad')">
+              <i class="ti ti-printer"></i> Imprimir
+            </button>
+          </div>
           <p class="comparacion__hint">Haz clic en una facultad para ver sus carreras, docentes y proyectos; vuelve a hacer clic para ver todas.</p>
           <div class="comparacion__scroll">
             <table class="rank rank--click">
@@ -208,12 +221,22 @@
             <div class="chart-card__body"><p-chart type="line" [data]="chartMes" [options]="optsLinea" /></div>
           </article>
           <article class="chart-card">
-            <h2 class="chart-card__title">Solicitudes por estado</h2>
-            <div class="chart-card__body"><p-chart type="doughnut" [data]="chartSolEstado" [options]="optsDonut" /></div>
+            <div class="chart-card__head">
+              <h2 class="chart-card__title">{{ tituloConFacultad('Solicitudes por estado') }}</h2>
+              <button type="button" class="btn-print" title="Imprimir este gráfico" (click)="imprimirGrafico($event, tituloConFacultad('Solicitudes por estado'))">
+                <i class="ti ti-printer"></i> Imprimir
+              </button>
+            </div>
+            <div class="chart-card__body"><p-chart type="doughnut" [data]="chartSolEstado" [options]="optsDonut" [plugins]="pluginsDonut" /></div>
           </article>
           <article class="chart-card">
-            <h2 class="chart-card__title">Proyectos por estado</h2>
-            <div class="chart-card__body"><p-chart type="doughnut" [data]="chartProyEstado" [options]="optsDonut" /></div>
+            <div class="chart-card__head">
+              <h2 class="chart-card__title">{{ tituloConFacultad('Proyectos por estado') }}</h2>
+              <button type="button" class="btn-print" title="Imprimir este gráfico" (click)="imprimirGrafico($event, tituloConFacultad('Proyectos por estado'))">
+                <i class="ti ti-printer"></i> Imprimir
+              </button>
+            </div>
+            <div class="chart-card__body"><p-chart type="doughnut" [data]="chartProyEstado" [options]="optsDonut" [plugins]="pluginsDonut" /></div>
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por tipo de intervención</h2>
@@ -297,30 +320,30 @@
 
         <!-- Rankings -->
         <section class="tables">
-          <article class="table-card">
+          <article class="table-card table-card--full">
             <h2 class="chart-card__title">Docentes más activos</h2>
             <table class="rank">
               <thead>
-                <tr><th>#</th><th>Docente</th><th>Planteam.</th><th>Aprobados</th><th>Proyectos</th><th>Horas hombre</th></tr>
+                <tr><th>#</th><th>Docente</th><th>Carrera</th><th>Facultad</th><th>Planteam.</th><th>Aprobados</th><th>Proyectos</th><th>Horas hombre</th></tr>
               </thead>
               <tbody>
                 <tr *ngFor="let x of d.rankingDocentes; let i = index">
-                  <td>{{ i + 1 }}</td><td>{{ x.docente }}</td><td>{{ x.planteamientos }}</td>
+                  <td>{{ i + 1 }}</td><td>{{ x.docente }}</td><td>{{ x.carrera }}</td><td>{{ x.facultad }}</td><td>{{ x.planteamientos }}</td>
                   <td>{{ x.aprobados }}</td><td>{{ x.proyectos }}</td><td>{{ fmt(x.horasHombre) }}</td>
                 </tr>
-                <tr *ngIf="!d.rankingDocentes.length"><td colspan="6" class="rank__empty">Sin datos</td></tr>
+                <tr *ngIf="!d.rankingDocentes.length"><td colspan="8" class="rank__empty">Sin datos</td></tr>
               </tbody>
             </table>
           </article>
           <article class="table-card">
-            <h2 class="chart-card__title">Alumnos voluntarios con más participación</h2>
+            <h2 class="chart-card__title">Alumnos voluntarios con mayor participación</h2>
             <table class="rank">
-              <thead><tr><th>#</th><th>Alumno</th><th>Proyectos</th></tr></thead>
+              <thead><tr><th>#</th><th>Alumno</th><th>Carrera</th><th>Proyectos</th></tr></thead>
               <tbody>
                 <tr *ngFor="let x of d.rankingAlumnos; let i = index">
-                  <td>{{ i + 1 }}</td><td>{{ x.alumno }}</td><td>{{ x.proyectos }}</td>
+                  <td>{{ i + 1 }}</td><td>{{ x.alumno }}</td><td>{{ x.carrera }}</td><td>{{ x.proyectos }}</td>
                 </tr>
-                <tr *ngIf="!d.rankingAlumnos.length"><td colspan="3" class="rank__empty">Sin datos</td></tr>
+                <tr *ngIf="!d.rankingAlumnos.length"><td colspan="4" class="rank__empty">Sin datos</td></tr>
               </tbody>
             </table>
           </article>

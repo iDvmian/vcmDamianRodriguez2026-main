@@ -55,12 +55,12 @@ export class DashboardService {
         },
         planteamiento: {
           include: {
-            docente: { select: { id: true, nombres: true, apellidos: true } },
+            docente: { select: { id: true, nombres: true, apellidos: true, carrera: { select: { nombre: true, facultad: { select: { nombre: true } } } } } },
             proyecto: {
               include: {
                 alumnos: {
                   include: {
-                    alumno: { select: { id: true, nombres: true, apellidos: true } },
+                    alumno: { select: { id: true, nombres: true, apellidos: true, carrera: { select: { nombre: true } } } },
                   },
                 },
               },
@@ -210,11 +210,13 @@ export class DashboardService {
     // ── Ranking de docentes ──────────────────────────────────────────────────
     const docentes = new Map<
       number,
-      { docente: string; planteamientos: number; aprobados: number; proyectos: number; horasHombre: number }
+      { docente: string; carrera: string; facultad: string; planteamientos: number; aprobados: number; proyectos: number; horasHombre: number }
     >();
     for (const p of planteamientos) {
       const d = docentes.get(p.docenteId) ?? {
         docente: `${p.docente.nombres} ${p.docente.apellidos}`,
+        carrera: p.docente.carrera?.nombre ?? '—',
+        facultad: p.docente.carrera?.facultad?.nombre ?? '—',
         planteamientos: 0,
         aprobados: 0,
         proyectos: 0,
@@ -233,11 +235,12 @@ export class DashboardService {
       .slice(0, 10);
 
     // ── Ranking de alumnos voluntarios ───────────────────────────────────────
-    const alumnos = new Map<number, { alumno: string; proyectos: number }>();
+    const alumnos = new Map<number, { alumno: string; carrera: string; proyectos: number }>();
     for (const pr of proyectos) {
       for (const a of pr.alumnos) {
         const x = alumnos.get(a.alumnoId) ?? {
           alumno: `${a.alumno.nombres} ${a.alumno.apellidos}`,
+          carrera: a.alumno.carrera?.nombre ?? '—',
           proyectos: 0,
         };
         x.proyectos++;

@@ -135,6 +135,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 16px;
+
+  // Tarjeta que ocupa todo el ancho de la fila
+  .table-card--full { grid-column: 1 / -1; }
 }
 
 .rank {
@@ -160,6 +163,31 @@
 }
 
 .chart-card--wide { grid-column: 1 / -1; }
+
+.chart-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--ucm-borde);
+  border-radius: 6px;
+  background: var(--ucm-card);
+  color: var(--ucm-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+
+  &:hover { border-color: var(--ucm-celeste); color: var(--ucm-celeste); }
+}
 
 // ── Inicio del solicitante ──────────────────────────────────
 .cliente {
@@ -343,6 +371,36 @@
 
 @media (max-width: 560px) {
   .step__label { font-size: 11px; }
+}
+
+// Selector del proceso que se compara entre facultades
+.vista {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--ucm-borde);
+  border-radius: 8px;
+  overflow: hidden;
+
+  &__btn {
+    padding: 5px 12px;
+    border: 0;
+    border-right: 1px solid var(--ucm-borde);
+    background: var(--ucm-card);
+    color: var(--ucm-muted);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:last-child { border-right: 0; }
+    &:hover { color: var(--ucm-celeste); }
+
+    &--activa, &--activa:hover {
+      background: var(--ucm-azul);
+      color: #fff;
+      font-weight: 600;
+    }
+  }
 }
 
 .comparacion__hint { margin: 0 0 0.75rem; color: #6b7280; font-size: 0.85rem; }

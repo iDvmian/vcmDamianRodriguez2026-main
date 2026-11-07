@@ -79,8 +79,8 @@ export interface Dashboard {
   porTipoIntervencion: { tipo: string; planteamientos: number; proyectos: number; horasHombre: number }[];
   porCarrera: { carrera: string; etiqueta: string; solicitudes: number; proyectos: number }[];
   porComuna: { comuna: string; solicitudes: number }[];
-  rankingDocentes: { docente: string; planteamientos: number; aprobados: number; proyectos: number; horasHombre: number }[];
-  rankingAlumnos: { alumno: string; proyectos: number }[];
+  rankingDocentes: { docente: string; carrera: string; facultad: string; planteamientos: number; aprobados: number; proyectos: number; horasHombre: number }[];
+  rankingAlumnos: { alumno: string; carrera: string; proyectos: number }[];
   seguimiento?: Seguimiento;
 }
 

@@ -151,10 +151,128 @@ export class DashboardComponent implements OnInit {
   chartHitos: any;
 
   readonly optsLinea = this.baseOptions(true);
+  /** Total y porcentaje de cada porción, considerando solo las que están visibles. */
+  private static porcion(chart: any, i: number): { valor: number; pct: number } {
+    const datos: number[] = chart.data.datasets[0].data;
+    const total = datos.reduce((acc, v, j) => acc + (chart.getDataVisibility(j) ? Number(v) || 0 : 0), 0);
+    const valor = Number(datos[i]) || 0;
+    return { valor, pct: total ? (valor / total) * 100 : 0 };
+  }
+
+  private static fmtPct(pct: number): string {
+    return pct.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '%';
+  }
+
   readonly optsDonut = {
     maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom' as const, labels: { usePointStyle: true } } },
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: {
+          usePointStyle: true,
+          // La leyenda muestra también cantidad y porcentaje: sirve para las porciones muy chicas
+          generateLabels: (chart: any) => {
+            const ds = chart.data.datasets[0];
+            return chart.data.labels.map((label: string, i: number) => {
+              const { valor, pct } = DashboardComponent.porcion(chart, i);
+              return {
+                text: `${label}: ${valor} (${DashboardComponent.fmtPct(pct)})`,
+                fillStyle: ds.backgroundColor[i],
+                strokeStyle: ds.backgroundColor[i],
+                pointStyle: 'circle',
+                hidden: !chart.getDataVisibility(i),
+                index: i,
+              };
+            });
+          },
+        },
+      },
+    },
   };
+
+  /** Dibuja la cantidad y el porcentaje sobre cada porción (las menores a 6% quedan solo en la leyenda). */
+  readonly pluginsDonut = [
+    {
+      id: 'etiquetasDona',
+      afterDatasetsDraw: (chart: any) => {
+        const ctx = chart.ctx;
+        chart.getDatasetMeta(0).data.forEach((arco: any, i: number) => {
+          if (!chart.getDataVisibility(i)) return;
+          const { valor, pct } = DashboardComponent.porcion(chart, i);
+          if (!valor || pct < 6) return;
+          const { x, y } = arco.tooltipPosition(true);
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = '600 13px sans-serif';
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.fillStyle = '#fff';
+          const lineas = [String(valor), DashboardComponent.fmtPct(pct)];
+          lineas.forEach((t, k) => {
+            const yy = y + (k - 0.5) * 15;
+            ctx.strokeText(t, x, yy);
+            ctx.fillText(t, x, yy);
+          });
+          ctx.restore();
+        });
+      },
+    },
+  ];
+
+  /** Imprime solo el gráfico de la tarjeta (con su título y la fecha), sin el resto de la pantalla. */
+  imprimirGrafico(evento: Event, titulo: string): void {
+    const tarjeta = (evento.currentTarget as HTMLElement).closest('.chart-card');
+    const canvas = tarjeta?.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    this.imprimirDocumento(titulo, `<img src="${canvas.toDataURL('image/png')}" alt="${titulo}" />`);
+  }
+
+  /** Imprime solo la tabla de la tarjeta (con su título y la fecha), en hoja horizontal. */
+  imprimirTabla(evento: Event, titulo: string): void {
+    const tarjeta = (evento.currentTarget as HTMLElement).closest('.table-card');
+    const tabla = tarjeta?.querySelector('table') as HTMLTableElement | null;
+    if (!tabla) return;
+    this.imprimirDocumento(titulo, tabla.outerHTML, true);
+  }
+
+  /** Arma una página limpia con el título y el contenido, y abre el cuadro de impresión del navegador. */
+  private imprimirDocumento(titulo: string, cuerpo: string, horizontal = false): void {
+    const fecha = new Date().toLocaleString('es-CL');
+
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument!;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title>
+      <style>
+        ${horizontal ? '@page { size: landscape; margin: 14mm; }' : ''}
+        body { font-family: Arial, sans-serif; margin: 32px; color: #1F2937; text-align: center; }
+        h1 { font-size: 20px; margin: 0 0 4px; color: #1B3D8C; }
+        p { font-size: 12px; color: #6B7280; margin: 0 0 24px; }
+        img { max-width: 100%; height: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid #E5E7EB; }
+        th { background: #F3F4F6; color: #1B3D8C; font-weight: 600; }
+        tr { page-break-inside: avoid; }
+      </style></head>
+      <body>
+        <h1>${titulo}</h1>
+        <p>VCM FCI · UCM — ${fecha}</p>
+        ${cuerpo}
+      </body></html>`);
+    doc.close();
+
+    const limpiar = () => setTimeout(() => iframe.remove(), 1000);
+    const lanzar = () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      limpiar();
+    };
+    const img = doc.querySelector('img');
+    if (img && !img.complete) img.onload = lanzar; else lanzar();
+  }
   readonly optsBarra = this.baseOptions(true);
   readonly optsBarraH = { ...this.baseOptions(false), indexAxis: 'y' as const };
 
@@ -275,17 +393,90 @@ export class DashboardComponent implements OnInit {
     return `${MESES[Number(m) - 1]} ${y}`;
   }
 
+  /** Facultad a la que corresponden los datos: la elegida en el filtro (Admin/Director) o la del Decano. */
+  get nombreFacultadFiltro(): string | null {
+    if (this.esGlobal) {
+      return this.facultadOptions.find((f) => f.value === this.facultadId)?.label ?? null;
+    }
+    return this.facultadDecano || null;
+  }
+
+  /** Título de un gráfico, con el nombre de la facultad cuando los datos son de una sola. */
+  tituloConFacultad(base: string): string {
+    const fac = this.nombreFacultadFiltro;
+    return fac ? `${base} — ${fac}` : base;
+  }
+
+  /** Proceso que se compara entre facultades: todo junto o una sola etapa. */
+  vistaFacultad: 'todo' | 'solicitudes' | 'planteamientos' | 'proyectos' = 'todo';
+  readonly vistasFacultad: { valor: 'todo' | 'solicitudes' | 'planteamientos' | 'proyectos'; label: string }[] = [
+    { valor: 'todo', label: 'Todo el proceso' },
+    { valor: 'solicitudes', label: 'Solicitudes' },
+    { valor: 'planteamientos', label: 'Planteamientos' },
+    { valor: 'proyectos', label: 'Proyectos' },
+  ];
+
+  cambiarVistaFacultad(vista: 'todo' | 'solicitudes' | 'planteamientos' | 'proyectos'): void {
+    this.vistaFacultad = vista;
+    if (this.data) this.armarChartFacultad(this.data);
+  }
+
+  /**
+   * Gráfico de comparación entre facultades. En "todo el proceso" muestra las etapas lado a lado;
+   * al elegir una etapa muestra solo esa, ordenada de mayor a menor para comparar con facilidad.
+   */
+  private armarChartFacultad(d: Dashboard): void {
+    const facs = [...(d.porFacultad ?? [])];
+    if (this.vistaFacultad === 'todo') {
+      this.chartFacultad = {
+        labels: facs.map((f) => f.etiqueta),
+        datasets: [
+          { label: 'Solicitudes', data: facs.map((f) => f.solicitudes), backgroundColor: CELESTE },
+          { label: 'Planteamientos', data: facs.map((f) => f.planteamientos), backgroundColor: TEAL },
+          { label: 'Proyectos', data: facs.map((f) => f.proyectos), backgroundColor: AZUL },
+          { label: 'Proyectos finalizados', data: facs.map((f) => f.finalizados), backgroundColor: VERDE },
+        ],
+      };
+      return;
+    }
+    const campo = this.vistaFacultad;
+    const meta = {
+      solicitudes: { label: 'Solicitudes', color: CELESTE },
+      planteamientos: { label: 'Planteamientos', color: TEAL },
+      proyectos: { label: 'Proyectos', color: AZUL },
+    }[campo];
+    facs.sort((a, b) => b[campo] - a[campo]);
+    this.chartFacultad = {
+      labels: facs.map((f) => f.etiqueta),
+      datasets: [{ label: meta.label, data: facs.map((f) => f[campo]), backgroundColor: meta.color }],
+    };
+  }
+
+  /** Cuando se muestra una sola etapa, escribe el valor sobre cada barra. */
+  readonly pluginsFacultad = [
+    {
+      id: 'valoresFacultad',
+      afterDatasetsDraw: (chart: any) => {
+        if (chart.data.datasets.length !== 1) return;
+        const ctx = chart.ctx;
+        chart.getDatasetMeta(0).data.forEach((barra: any, i: number) => {
+          const valor = Number(chart.data.datasets[0].data[i]) || 0;
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.font = '600 12px sans-serif';
+          ctx.fillStyle = '#374151';
+          ctx.fillText(String(valor), barra.x, barra.y - 4);
+          ctx.restore();
+        });
+      },
+    },
+  ];
+
   private armarGraficos(d: Dashboard): void {
     const r = d.resumen;
 
-    this.chartFacultad = {
-      labels: (d.porFacultad ?? []).map((f) => f.etiqueta),
-      datasets: [
-        { label: 'Solicitudes', data: (d.porFacultad ?? []).map((f) => f.solicitudes), backgroundColor: CELESTE },
-        { label: 'Proyectos', data: (d.porFacultad ?? []).map((f) => f.proyectos), backgroundColor: AZUL },
-        { label: 'Proyectos finalizados', data: (d.porFacultad ?? []).map((f) => f.finalizados), backgroundColor: VERDE },
-      ],
-    };
+    this.armarChartFacultad(d);
 
     this.chartMes = {
       labels: d.porMes.map((m) => this.mesLabel(m.mes)),
