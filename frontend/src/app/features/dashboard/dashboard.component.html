@@ -183,27 +183,38 @@
         </article>
         <article class="table-card chart-card--wide">
           <div class="chart-card__head">
-            <h2 class="chart-card__title">Detalle por facultad</h2>
-            <button type="button" class="btn-print" title="Imprimir esta tabla" (click)="imprimirTabla($event, 'Detalle por facultad')">
+            <h2 class="chart-card__title">{{ tituloDetalle }}</h2>
+            <button type="button" class="btn-print" title="Imprimir esta tabla" (click)="imprimirTabla($event, tituloDetalle)">
               <i class="ti ti-printer"></i> Imprimir
             </button>
           </div>
-          <p class="comparacion__hint">Haz clic en una facultad para ver sus carreras, docentes y proyectos; vuelve a hacer clic para ver todas.</p>
+          <p class="comparacion__hint">
+            Haz clic en una facultad para ver sus carreras, docentes y proyectos.
+          </p>
           <div class="comparacion__scroll">
-            <table class="rank rank--click">
+            <table class="rank rank--click rank--animada">
               <thead>
                 <tr>
-                  <th>Facultad</th><th>Solicitudes</th><th>Aprobadas</th><th>Proyectos</th><th>Finalizados</th>
-                  <th>Conversión</th><th>Horas hombre</th><th>Personas</th><th>Alumnos vol.</th>
+                  <th *ngFor="let c of columnasDetalle; trackBy: trackColumna" class="col--nueva"
+                      [class.col--seccion]="!!c.seccion" [class.col--activa]="!!c.seccion && seccionDetalle === c.seccion"
+                      [attr.title]="c.seccion ? (seccionDetalle ? 'Volver a la vista general' : 'Ver el desglose de ' + c.label) : null"
+                      (click)="alternarSeccionDetalle(c.seccion)">
+                    {{ c.label }}
+                    <i *ngIf="c.seccion" class="ti" [ngClass]="seccionDetalle ? 'ti-chevron-left' : 'ti-chevron-right'"></i>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let f of d.porFacultad" [class.rank__sel]="f.facultadId === facultadId" (click)="seleccionarFacultad(f.facultadId)">
-                  <td>{{ f.facultad }}</td><td>{{ f.solicitudes }}</td><td>{{ f.aprobadas }}</td>
-                  <td>{{ f.proyectos }}</td><td>{{ f.finalizados }}</td><td>{{ f.tasaConversion }}%</td>
-                  <td>{{ fmt(f.horasHombre) }}</td><td>{{ fmt(f.participantes) }}</td><td>{{ f.alumnosVoluntarios }}</td>
+                  <td *ngFor="let c of columnasDetalle; trackBy: trackColumna; let i = index" class="col--nueva"
+                      [style.animation-delay.ms]="i * 40">{{ valorDetalle(f, c) }}</td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr>
+                  <td *ngFor="let c of columnasDetalle; trackBy: trackColumna" class="col--nueva">{{ valorTotalDetalle(c) }}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </article>

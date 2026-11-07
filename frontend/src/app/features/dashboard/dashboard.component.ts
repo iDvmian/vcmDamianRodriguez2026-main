@@ -25,6 +25,55 @@ const AMARILLO = '#F59E0B';
 const ROJO = '#EF4444';
 const GRIS = '#9CA3AF';
 
+type SeccionDetalle = 'solicitudes' | 'proyectos' | 'personas';
+
+/** Columna de la tabla "Detalle por facultad". `seccion` marca los encabezados que se pueden pulsar para desglosar. */
+interface ColumnaDetalle {
+  clave: string;
+  label: string;
+  seccion?: SeccionDetalle;
+}
+
+const COLUMNAS_GENERAL: ColumnaDetalle[] = [
+  { clave: 'facultad', label: 'Facultad' },
+  { clave: 'solicitudes', label: 'Solicitudes', seccion: 'solicitudes' },
+  { clave: 'aprobadas', label: 'Aprobadas' },
+  { clave: 'proyectos', label: 'Proyectos', seccion: 'proyectos' },
+  { clave: 'finalizados', label: 'Finalizados' },
+  { clave: 'tasaConversion', label: 'Conversión' },
+  { clave: 'horasHombre', label: 'Horas hombre' },
+  { clave: 'participantes', label: 'Personas impactadas', seccion: 'personas' },
+  { clave: 'alumnosVoluntarios', label: 'Alumnos vol.' },
+];
+
+/** Desglose de cada sección: el primer dato es el total y sigue siendo pulsable para volver. */
+const COLUMNAS_DESGLOSE: Record<SeccionDetalle, ColumnaDetalle[]> = {
+  solicitudes: [
+    { clave: 'facultad', label: 'Facultad' },
+    { clave: 'solicitudes', label: 'Solicitudes', seccion: 'solicitudes' },
+    { clave: 'aprobadas', label: 'Aprobadas' },
+    { clave: 'rechazadas', label: 'Rechazadas' },
+    { clave: 'pendientes', label: 'Pendientes' },
+  ],
+  proyectos: [
+    { clave: 'facultad', label: 'Facultad' },
+    { clave: 'proyectos', label: 'Proyectos', seccion: 'proyectos' },
+    { clave: 'enProceso', label: 'En proceso' },
+    { clave: 'pausados', label: 'Pausados' },
+    { clave: 'finalizados', label: 'Finalizados' },
+    { clave: 'cancelados', label: 'Cancelados' },
+  ],
+  personas: [
+    { clave: 'facultad', label: 'Facultad' },
+    { clave: 'participantes', label: 'Personas impactadas', seccion: 'personas' },
+    { clave: 'docentes', label: 'Docentes' },
+    { clave: 'estudiantes', label: 'Estudiantes' },
+    { clave: 'docentesExternos', label: 'Docentes externos' },
+    { clave: 'alumnosExternos', label: 'Alumnos externos' },
+    { clave: 'otrosExternos', label: 'Otros externos' },
+  ],
+};
+
 type HitoClave = 'todos' | 'solicitudes' | 'solicitudesAprobadas' | 'planteamientosAprobados' | 'proyectosCreados' | 'proyectosFinalizados';
 type AgrupacionHitos = 'mes' | 'trimestre' | 'anio';
 
@@ -248,7 +297,7 @@ export class DashboardComponent implements OnInit {
     const tarjeta = (evento.currentTarget as HTMLElement).closest('.table-card');
     const tabla = tarjeta?.querySelector('table') as HTMLTableElement | null;
     if (!tabla) return;
-    this.imprimirDocumento(titulo, tabla.outerHTML, true);
+    this.imprimirDocumento(titulo, tabla.outerHTML.replace(/<i [^>]*><\/i>/g, ''), true);
   }
 
   /** Arma una página limpia con el título y el contenido, y abre el cuadro de impresión del navegador. */
@@ -442,6 +491,51 @@ export class DashboardComponent implements OnInit {
   private mesLabel(key: string): string {
     const [y, m] = key.split('-');
     return `${MESES[Number(m) - 1]} ${y}`;
+  }
+
+  // ── Tabla "Detalle por facultad": vista general o desglose de una sección ───────────────────────
+  seccionDetalle: SeccionDetalle | null = null;
+
+  get columnasDetalle(): ColumnaDetalle[] {
+    return this.seccionDetalle ? COLUMNAS_DESGLOSE[this.seccionDetalle] : COLUMNAS_GENERAL;
+  }
+
+  get tituloDetalle(): string {
+    const nombres: Record<SeccionDetalle, string> = {
+      solicitudes: 'Solicitudes',
+      proyectos: 'Proyectos',
+      personas: 'Personas impactadas',
+    };
+    return 'Detalle por facultad' + (this.seccionDetalle ? ` — ${nombres[this.seccionDetalle]}` : '');
+  }
+
+  /** Pulsar el encabezado de una sección la desglosa; pulsarlo de nuevo vuelve a la vista general. */
+  alternarSeccionDetalle(seccion: SeccionDetalle | undefined): void {
+    if (!seccion) return;
+    this.seccionDetalle = this.seccionDetalle === seccion ? null : seccion;
+  }
+
+  trackColumna(_: number, c: ColumnaDetalle): string {
+    return c.clave;
+  }
+
+  /** Texto de una celda de la tabla, con el formato que corresponda a la columna. */
+  valorDetalle(f: any, c: ColumnaDetalle): string {
+    if (c.clave === 'facultad') return f.facultad;
+    if (c.clave === 'tasaConversion') return `${f.tasaConversion}%`;
+    return this.fmt(f[c.clave]);
+  }
+
+  /** Fila de totales de la tabla (suma de todas las facultades mostradas). */
+  valorTotalDetalle(c: ColumnaDetalle): string {
+    const facs: any[] = this.data?.porFacultad ?? [];
+    if (c.clave === 'facultad') return 'Total';
+    if (c.clave === 'tasaConversion') {
+      const sol = facs.reduce((a, f) => a + f.solicitudes, 0);
+      const proy = facs.reduce((a, f) => a + f.proyectos, 0);
+      return sol ? `${Math.round((proy / sol) * 1000) / 10}%` : '0%';
+    }
+    return this.fmt(facs.reduce((a, f) => a + (Number(f[c.clave]) || 0), 0));
   }
 
   /** Facultad a la que corresponden los datos: la elegida en el filtro (Admin/Director) o la del Decano. */

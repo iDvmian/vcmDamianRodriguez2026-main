@@ -420,6 +420,40 @@
 .comparacion__scroll { overflow-x: auto; }
 .rank--click tbody tr { cursor: pointer; }
 .rank--click tbody tr:hover { background: #f3f6fb; }
+// Tabla de detalle por facultad: encabezados pulsables, columnas que entran con animación y fila de totales
+.rank--animada {
+  th.col--seccion {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    color: var(--ucm-azul);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+
+    &:hover { color: var(--ucm-celeste); }
+    i { font-size: 12px; vertical-align: -1px; }
+  }
+  th.col--activa { color: var(--ucm-celeste); }
+
+  // Se reproduce cuando la columna aparece (al cambiar de vista), no en las que se mantienen
+  .col--nueva { animation: colEntra 0.4s ease both; }
+
+  tfoot td {
+    font-weight: 600;
+    border-top: 2px solid var(--ucm-borde);
+    background: #f8fafc;
+  }
+}
+
+@keyframes colEntra {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank--animada .col--nueva { animation: none; }
+}
+
 .rank--click tbody tr.rank__sel { background: #e3ecfb; font-weight: 600; }
 
 // ── Seguimiento de cada fase ────────────────────────────────

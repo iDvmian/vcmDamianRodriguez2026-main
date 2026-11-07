@@ -82,7 +82,9 @@ export class DashboardService {
       facultadId: number; facultad: string; etiqueta: string;
       solicitudes: number; aprobadas: number; rechazadas: number; pendientes: number;
       planteamientos: number; proyectos: number; finalizados: number;
+      enProceso: number; pausados: number; cancelados: number;
       horasHombre: number; participantes: number; alumnos: Set<number>;
+      docentes: number; estudiantes: number; docentesExternos: number; alumnosExternos: number; otrosExternos: number;
     }>();
     for (const s of todas) {
       if (!s.carrera) continue;
@@ -90,7 +92,9 @@ export class DashboardService {
       const f = facultades.get(fid) ?? {
         facultadId: fid, facultad: s.carrera.facultad.nombre, etiqueta: s.carrera.facultad.etiqueta,
         solicitudes: 0, aprobadas: 0, rechazadas: 0, pendientes: 0,
-        planteamientos: 0, proyectos: 0, finalizados: 0, horasHombre: 0, participantes: 0, alumnos: new Set<number>(),
+        planteamientos: 0, proyectos: 0, finalizados: 0, enProceso: 0, pausados: 0, cancelados: 0,
+        horasHombre: 0, participantes: 0, alumnos: new Set<number>(),
+        docentes: 0, estudiantes: 0, docentesExternos: 0, alumnosExternos: 0, otrosExternos: 0,
       };
       f.solicitudes++;
       if (s.estado === 'APROBADA') f.aprobadas++;
@@ -103,7 +107,15 @@ export class DashboardService {
         if (pr) {
           f.proyectos++;
           if (pr.estado === 'FINALIZADO') f.finalizados++;
+          else if (pr.estado === 'EN_PROCESO') f.enProceso++;
+          else if (pr.estado === 'PAUSADO') f.pausados++;
+          else if (pr.estado === 'CANCELADO') f.cancelados++;
           f.horasHombre += pl.horasHombre ?? 0;
+          f.docentes += pr.participantesDocentes ?? 0;
+          f.estudiantes += pr.participantesEstudiantes ?? 0;
+          f.docentesExternos += pr.participantesDocentesExternos ?? 0;
+          f.alumnosExternos += pr.participantesAlumnosExternos ?? 0;
+          f.otrosExternos += pr.participantesOtrosExternos ?? 0;
           f.participantes += (pr.participantesDocentes ?? 0) + (pr.participantesEstudiantes ?? 0) +
             (pr.participantesDocentesExternos ?? 0) + (pr.participantesAlumnosExternos ?? 0) + (pr.participantesOtrosExternos ?? 0);
           for (const a of pr.alumnos) f.alumnos.add(a.alumnoId);

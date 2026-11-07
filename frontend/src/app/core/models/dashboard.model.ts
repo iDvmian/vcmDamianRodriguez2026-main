@@ -27,8 +27,16 @@ export interface FacultadComparada {
   planteamientos: number;
   proyectos: number;
   finalizados: number;
+  enProceso: number;
+  pausados: number;
+  cancelados: number;
   horasHombre: number;
   participantes: number;
+  docentes: number;
+  estudiantes: number;
+  docentesExternos: number;
+  alumnosExternos: number;
+  otrosExternos: number;
   alumnosVoluntarios: number;
   tasaConversion: number;
 }
