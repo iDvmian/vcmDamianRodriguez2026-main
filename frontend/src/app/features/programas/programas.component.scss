@@ -1,0 +1,230 @@
+.page {
+  padding: 24px;
+  background: var(--ucm-bg);
+  min-height: calc(100vh - 64px);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ucm-azul);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    i { font-size: 24px; }
+  }
+
+  &__card {
+    background: var(--ucm-card);
+    border: 1px solid var(--ucm-borde);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--ucm-celeste);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+
+  &:hover { opacity: 0.88; }
+  i { font-size: 16px; }
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 17px;
+  transition: background 0.15s;
+
+  &--edit {
+    color: var(--ucm-celeste);
+    &:hover { background: rgba(41, 171, 226, 0.12); }
+  }
+
+  &--delete {
+    color: var(--ucm-danger);
+    &:hover { background: rgba(239, 68, 68, 0.12); }
+  }
+}
+
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-actions {
+  width: 96px;
+  text-align: center;
+}
+
+.empty-cell {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ucm-muted);
+  font-size: 14px;
+
+  i {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 10px;
+    opacity: 0.4;
+  }
+}
+
+.field {
+  margin-bottom: 18px;
+
+  &__label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ucm-texto);
+  }
+
+  .required {
+    color: var(--ucm-danger);
+    margin-left: 2px;
+  }
+
+  &__input {
+    width: 100%;
+  }
+
+  &__hint {
+    display: block;
+    font-size: 12px;
+    color: var(--ucm-muted);
+    margin-top: 4px;
+  }
+
+  &__error {
+    display: block;
+    font-size: 12px;
+    color: var(--ucm-danger);
+    margin-top: 4px;
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel {
+  background: none;
+  border: 1px solid var(--ucm-borde);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ucm-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--ucm-bg);
+    color: var(--ucm-texto);
+  }
+}
+
+.btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--ucm-celeste);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+
+  &:hover { opacity: 0.88; }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.page__hint {
+  margin: -8px 0 16px;
+  font-size: 13px;
+  color: #64748b;
+  max-width: 820px;
+}
+
+.col-orden { width: 56px; text-align: center; }
+.col-nombre { font-weight: 600; color: var(--ucm-azul); min-width: 220px; }
+.col-desc { max-width: 380px; color: #475569; }
+.fila-inactiva td { opacity: 0.6; }
+.text-muted { color: #94a3b8; font-style: italic; }
+
+.field__textarea { resize: vertical; min-height: 80px; font-family: inherit; line-height: 1.4; }
+
+.field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+
+  .field { width: 140px; margin-bottom: 0; }
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  padding-bottom: 8px;
+}
+
+.header-acciones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.btn-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--ucm-borde);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ucm-azul);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  &:hover { background: #f8fafc; }
+}

@@ -10,6 +10,7 @@ import { registrarEtapa } from '../common/seguimiento';
 import { facultadDelDecano } from '../common/alcance';
 import { COMUNAS_MAULE } from '../common/constants/comunas-maule';
 import { COMUNAS_POR_REGION } from '../common/constants/comunas-chile';
+import { PAISES } from '../common/constants/paises';
 import { REGIONES_FUERA_DEL_MAULE } from '../common/constants/regiones-chile';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,7 @@ import { CurrentUser } from '../auth/strategies/jwt.strategy';
 const SOLICITUD_INCLUDE = {
   cliente: { select: { id: true, nombres: true, apellidos: true, email: true, rut: true } },
   carrera: { include: { facultad: true } },
+  programa: { select: { id: true, nombre: true } },
   archivos: true,
   planteamiento: { select: { id: true, estado: true, createdAt: true } },
 } as const;
@@ -278,12 +280,20 @@ export class SolicitudesService {
         return { alcance: u.alcance, ciudad, direccion, region, pais: 'Chile' };
 
       case AlcanceVinculacion.INTERNACIONAL:
-        if (!pais) throw new BadRequestException('En una vinculación internacional, indica el país');
+        if (!pais || !PAISES.includes(pais)) {
+          throw new BadRequestException('En una vinculación internacional, elige un país de la lista');
+        }
         return { alcance: u.alcance, ciudad, direccion, region: null, pais };
 
       default:
         throw new BadRequestException('Alcance inválido');
     }
+  }
+
+  /** El programa debe existir y estar vigente. */
+  private async validarPrograma(programaId: number) {
+    const programa = await this.prisma.programa.findUnique({ where: { id: programaId } });
+    if (!programa || !programa.activo) throw new BadRequestException('El programa de vinculación seleccionado no es válido');
   }
 
   async create(dto: CreateSolicitudDto, currentUser: CurrentUser) {
@@ -306,12 +316,14 @@ export class SolicitudesService {
       if (!carrera) throw new NotFoundException('Carrera no encontrada');
     }
 
+    await this.validarPrograma(dto.programaId);
     const ubicacion = this.normalizarUbicacion(dto);
 
     const solicitud = await this.prisma.solicitud.create({
       data: {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
+        programaId: dto.programaId,
         ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,
@@ -356,6 +368,8 @@ export class SolicitudesService {
       throw new BadRequestException('Indica la organización o grupo con el que trabajarás');
     }
 
+    if (dto.programaId !== undefined) await this.validarPrograma(dto.programaId);
+
     // Si se toca algún dato de ubicación, se revalida todo junto con lo que ya tenía la solicitud
     const cambiaUbicacion = [dto.alcance, dto.ciudad, dto.region, dto.pais, dto.direccion].some((v) => v !== undefined);
     const ubicacion = cambiaUbicacion
@@ -373,6 +387,7 @@ export class SolicitudesService {
       data: {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
+        programaId: dto.programaId,
         ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,

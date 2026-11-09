@@ -44,6 +44,7 @@ export class DashboardService {
     const todas = await this.prisma.solicitud.findMany({
       where,
       include: {
+        programa: { select: { id: true, nombre: true } },
         carrera: {
           select: {
             id: true,
@@ -208,6 +209,58 @@ export class DashboardService {
       (a, b) => b.solicitudes - a.solicitudes || b.proyectos - a.proyectos,
     );
 
+    // ── Por programa de vinculación (se muestran todos los vigentes, incluso sin solicitudes) ──
+    const programasVigentes = await this.prisma.programa.findMany({
+      where: { activo: true },
+      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+      select: { id: true, nombre: true },
+    });
+    const programas = new Map<number | 'sin', { programa: string; solicitudes: number; proyectos: number }>();
+    for (const pg of programasVigentes) programas.set(pg.id, { programa: pg.nombre, solicitudes: 0, proyectos: 0 });
+    for (const s of solicitudes) {
+      const k = s.programaId ?? 'sin';
+      let e = programas.get(k);
+      if (!e) {
+        e = { programa: s.programa?.nombre ?? 'Sin programa', solicitudes: 0, proyectos: 0 };
+        programas.set(k, e);
+      }
+      e.solicitudes++;
+      if (s.planteamiento?.proyecto) e.proyectos++;
+    }
+    const porPrograma = [...programas.values()].sort((a, b) => b.solicitudes - a.solicitudes || b.proyectos - a.proyectos);
+
+    // ── Por ubicación: alcance, región, comuna y país (solicitudes y los proyectos que llegaron a ser) ──
+    const agrupar = (clave: (s: (typeof solicitudes)[number]) => string | null) => {
+      const m = new Map<string, { nombre: string; solicitudes: number; proyectos: number }>();
+      for (const s of solicitudes) {
+        const k = clave(s);
+        if (k === null) continue;
+        const e = m.get(k) ?? { nombre: k, solicitudes: 0, proyectos: 0 };
+        e.solicitudes++;
+        if (s.planteamiento?.proyecto) e.proyectos++;
+        m.set(k, e);
+      }
+      return [...m.values()].sort((a, b) => b.solicitudes - a.solicitudes || b.proyectos - a.proyectos);
+    };
+    // Comunas de cada región (para ver el detalle al elegir una región)
+    const nombreRegion = (s: (typeof solicitudes)[number]) => s.region?.trim() || 'Sin región';
+    const comunasPorRegion: Record<string, { nombre: string; solicitudes: number; proyectos: number }[]> = {};
+    const regionesConDatos = new Set(solicitudes.filter((s) => s.alcance !== 'INTERNACIONAL').map(nombreRegion));
+    for (const reg of regionesConDatos) {
+      comunasPorRegion[reg] = agrupar((s) =>
+        s.alcance === 'INTERNACIONAL' || nombreRegion(s) !== reg ? null : s.ciudad?.trim() || 'Sin comuna',
+      );
+    }
+    const porUbicacion = {
+      alcance: (['REGIONAL', 'NACIONAL', 'INTERNACIONAL'] as const).map((a) => {
+        const delAlcance = solicitudes.filter((s) => s.alcance === a);
+        return { nombre: a, solicitudes: delAlcance.length, proyectos: delAlcance.filter((s) => s.planteamiento?.proyecto).length };
+      }),
+      region: agrupar((s) => (s.alcance === 'INTERNACIONAL' ? null : s.region?.trim() || 'Sin región')),
+      comunasPorRegion,
+      pais: agrupar((s) => s.pais?.trim() || 'Sin país'),
+    };
+
     // ── Por comuna ───────────────────────────────────────────────────────────
     const comunas = new Map<string, number>();
     for (const s of solicitudes) {
@@ -294,6 +347,8 @@ export class DashboardService {
       porTipoIntervencion,
       porCarrera,
       porComuna,
+      porPrograma,
+      porUbicacion,
       rankingDocentes,
       rankingAlumnos,
       seguimiento: await this.calcularSeguimiento(solicitudes),

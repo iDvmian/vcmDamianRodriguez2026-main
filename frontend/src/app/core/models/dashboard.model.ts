@@ -80,6 +80,12 @@ export interface Seguimiento {
   };
 }
 
+export interface UbicacionContada {
+  nombre: string;
+  solicitudes: number;
+  proyectos: number;
+}
+
 export interface Dashboard {
   resumen: DashboardResumen;
   porFacultad: FacultadComparada[];
@@ -87,6 +93,13 @@ export interface Dashboard {
   porTipoIntervencion: { tipo: string; planteamientos: number; proyectos: number; horasHombre: number }[];
   porCarrera: { carrera: string; etiqueta: string; solicitudes: number; proyectos: number }[];
   porComuna: { comuna: string; solicitudes: number }[];
+  porPrograma: { programa: string; solicitudes: number; proyectos: number }[];
+  porUbicacion: {
+    alcance: UbicacionContada[];
+    region: UbicacionContada[];
+    comunasPorRegion: Record<string, UbicacionContada[]>;
+    pais: UbicacionContada[];
+  };
   rankingDocentes: { docente: string; carrera: string; facultad: string; planteamientos: number; aprobados: number; proyectos: number; horasHombre: number }[];
   rankingAlumnos: { alumno: string; carrera: string; proyectos: number }[];
   seguimiento?: Seguimiento;

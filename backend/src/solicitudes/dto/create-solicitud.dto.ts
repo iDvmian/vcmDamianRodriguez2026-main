@@ -15,11 +15,16 @@ export class CreateSolicitudDto {
   @MaxLength(560)
   descripcion: string;
 
-  @ApiProperty({ enum: AlcanceVinculacion, example: AlcanceVinculacion.LOCAL, description: 'Alcance territorial de la vinculación' })
+  @ApiProperty({ example: 1, description: 'Programa de Vinculación con el Medio al que se asocia la solicitud' })
+  @IsInt({ message: 'Selecciona un programa de vinculación' })
+  @IsPositive({ message: 'Selecciona un programa de vinculación' })
+  programaId: number;
+
+  @ApiProperty({ enum: AlcanceVinculacion, example: AlcanceVinculacion.REGIONAL, description: 'Alcance territorial de la vinculación' })
   @IsEnum(AlcanceVinculacion, { message: 'Alcance inválido' })
   alcance: AlcanceVinculacion;
 
-  @ApiPropertyOptional({ example: 'Talca', description: 'Local: comuna del Maule (obligatoria). Regional: comuna del Maule (opcional). Nacional/internacional: ciudad (opcional)' })
+  @ApiPropertyOptional({ example: 'Talca', description: 'Regional: comuna del Maule (obligatoria). Nacional: comuna de la región (obligatoria). Internacional: ciudad (opcional)' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -37,7 +42,7 @@ export class CreateSolicitudDto {
   @MaxLength(100)
   pais?: string | null;
 
-  @ApiPropertyOptional({ example: 'Calle 1 Norte', description: 'Obligatoria cuando el alcance es LOCAL' })
+  @ApiPropertyOptional({ example: 'Calle 1 Norte', description: 'Obligatoria cuando el alcance es REGIONAL' })
   @IsOptional()
   @IsString()
   @MaxLength(150)

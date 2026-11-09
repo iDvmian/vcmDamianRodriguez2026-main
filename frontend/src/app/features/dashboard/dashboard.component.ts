@@ -25,6 +25,14 @@ const AMARILLO = '#F59E0B';
 const ROJO = '#EF4444';
 const GRIS = '#9CA3AF';
 
+type VistaUbicacion = 'alcance' | 'region' | 'pais';
+
+const ALCANCE_ETIQUETA: Record<string, string> = {
+  REGIONAL: 'Regional (Maule)',
+  NACIONAL: 'Nacional',
+  INTERNACIONAL: 'Internacional',
+};
+
 type SeccionDetalle = 'solicitudes' | 'proyectos' | 'personas';
 
 /** Columna de la tabla "Detalle por facultad". `seccion` marca los encabezados que se pueden pulsar para desglosar. */
@@ -208,7 +216,8 @@ export class DashboardComponent implements OnInit {
   chartTipo: any;
   chartCarrera: any;
   chartFacultad: any;
-  chartComuna: any;
+  chartUbicacion: any;
+  chartPrograma: any;
   chartEmbudo: any;
   chartTiempos: any;
   chartRechazo: any;
@@ -372,6 +381,28 @@ export class DashboardComponent implements OnInit {
   get alturaTipo(): number {
     const n = this.chartTipo?.labels?.length ?? 0;
     return Math.max(280, n * 62 + 80);
+  }
+
+  /** Alto del gráfico por programa: crece con la cantidad de programas (los nombres ocupan varias líneas). */
+  get alturaPrograma(): number {
+    const n = this.chartPrograma?.labels?.length ?? 0;
+    return Math.max(320, n * 66 + 80);
+  }
+
+  /** Parte un nombre largo en líneas para que el eje no lo corte. */
+  private partirNombre(nombre: string, max = 34): string[] {
+    const lineas: string[] = [];
+    let actual = '';
+    for (const palabra of nombre.split(' ')) {
+      if (actual && (actual + ' ' + palabra).length > max) {
+        lineas.push(actual);
+        actual = palabra;
+      } else {
+        actual = actual ? `${actual} ${palabra}` : palabra;
+      }
+    }
+    if (actual) lineas.push(actual);
+    return lineas;
   }
 
   ngOnInit(): void {
@@ -552,6 +583,70 @@ export class DashboardComponent implements OnInit {
     return fac ? `${base} — ${fac}` : base;
   }
 
+  // ── Ubicación de las solicitudes: por alcance, región, comuna o país ────────────────────────
+  vistaUbicacion: VistaUbicacion = 'alcance';
+  readonly vistasUbicacion: { valor: VistaUbicacion; label: string; titulo: string }[] = [
+    { valor: 'alcance', label: 'Alcance', titulo: 'Solicitudes por alcance' },
+    { valor: 'region', label: 'Región', titulo: 'Solicitudes por región' },
+    { valor: 'pais', label: 'País', titulo: 'Solicitudes por país' },
+  ];
+
+  /** Región elegida para ver sus comunas (solo en la vista "Región"). */
+  regionElegida: string | null = null;
+
+  get tituloUbicacion(): string {
+    if (this.vistaUbicacion === 'region' && this.regionElegida) return `Solicitudes por comuna — ${this.regionElegida}`;
+    return this.vistasUbicacion.find((v) => v.valor === this.vistaUbicacion)?.titulo ?? '';
+  }
+
+  /** Regiones que tienen solicitudes, para elegir una y ver sus comunas. */
+  get regionesConDatos(): string[] {
+    return (this.data?.porUbicacion?.region ?? []).map((r) => r.nombre).filter((n) => n !== 'Sin región');
+  }
+
+  cambiarVistaUbicacion(vista: VistaUbicacion): void {
+    this.vistaUbicacion = vista;
+    if (vista !== 'region') this.regionElegida = null;
+    if (this.data) this.armarChartUbicacion(this.data);
+  }
+
+  /** Elige una región para ver sus comunas; con null vuelve a todas las regiones. */
+  elegirRegion(region: string | null): void {
+    this.regionElegida = region || null;
+    if (this.data) this.armarChartUbicacion(this.data);
+  }
+
+  /** Al hacer clic en una barra de región se abre el detalle de sus comunas. */
+  seleccionarBarraUbicacion(evento: any): void {
+    if (this.vistaUbicacion !== 'region' || this.regionElegida) return;
+    const indice = evento?.element?.index;
+    const region = this.data?.porUbicacion?.region?.[indice]?.nombre;
+    if (region && region !== 'Sin región') this.elegirRegion(region);
+  }
+
+  /** Alto del gráfico de ubicación: crece con la cantidad de barras. */
+  get alturaUbicacion(): number {
+    const n = this.chartUbicacion?.labels?.length ?? 0;
+    return Math.max(240, n * 62 + 80);
+  }
+
+  private armarChartUbicacion(d: Dashboard): void {
+    const ub = d.porUbicacion;
+    // Si con los filtros actuales la región elegida ya no tiene solicitudes, se vuelve a la lista de regiones
+    if (this.regionElegida && !ub?.comunasPorRegion?.[this.regionElegida]) this.regionElegida = null;
+    const items =
+      this.vistaUbicacion === 'region' && this.regionElegida
+        ? ub?.comunasPorRegion?.[this.regionElegida] ?? []
+        : ub?.[this.vistaUbicacion] ?? [];
+    this.chartUbicacion = {
+      labels: items.map((i) => (this.vistaUbicacion === 'alcance' ? ALCANCE_ETIQUETA[i.nombre] ?? i.nombre : i.nombre)),
+      datasets: [
+        { label: 'Solicitudes', data: items.map((i) => i.solicitudes), backgroundColor: TEAL },
+        { label: 'Proyectos', data: items.map((i) => i.proyectos), backgroundColor: AZUL },
+      ],
+    };
+  }
+
   /** Proceso que se compara entre facultades: todo junto o una sola etapa. */
   vistaFacultad: 'todo' | 'solicitudes' | 'planteamientos' | 'proyectos' = 'todo';
   readonly vistasFacultad: { valor: 'todo' | 'solicitudes' | 'planteamientos' | 'proyectos'; label: string }[] = [
@@ -678,10 +773,17 @@ export class DashboardComponent implements OnInit {
       ],
     };
 
-    this.chartComuna = {
-      labels: d.porComuna.map((c) => c.comuna),
-      datasets: [{ label: 'Solicitudes', data: d.porComuna.map((c) => c.solicitudes), backgroundColor: TEAL }],
+    // Ya viene de mayor a menor; los nombres largos se parten en varias líneas
+    const programas = d.porPrograma ?? [];
+    this.chartPrograma = {
+      labels: programas.map((p) => this.partirNombre(p.programa)),
+      datasets: [
+        { label: 'Solicitudes', data: programas.map((p) => p.solicitudes), backgroundColor: CELESTE },
+        { label: 'Proyectos', data: programas.map((p) => p.proyectos), backgroundColor: AZUL },
+      ],
     };
+
+    this.armarChartUbicacion(d);
 
     this.armarSeguimiento(d);
   }

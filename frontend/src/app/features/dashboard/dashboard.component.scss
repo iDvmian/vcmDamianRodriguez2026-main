@@ -498,3 +498,14 @@
     strong { color: var(--ucm-texto); }
   }
 }
+
+// Gráfico de ubicación: selector de región y cursor de clic sobre las barras
+.ubicacion-region {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.chart-clicable ::ng-deep canvas { cursor: pointer; }

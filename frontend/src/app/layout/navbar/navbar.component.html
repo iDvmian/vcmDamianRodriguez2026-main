@@ -9,6 +9,9 @@
        [routerLinkActiveOptions]="{ exact: true }" class="navbar__link">
       {{ inicioLabel }}
     </a>
+    <a routerLink="/dashboard/programas" routerLinkActive="navbar__link--active" class="navbar__link">
+      Programas
+    </a>
     <a *ngIf="showFacultades" routerLink="/dashboard/facultades" routerLinkActive="navbar__link--active" class="navbar__link">
       Facultades
     </a>

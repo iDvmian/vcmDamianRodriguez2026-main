@@ -250,6 +250,10 @@
             <div class="chart-card__body"><p-chart type="doughnut" [data]="chartProyEstado" [options]="optsDonut" [plugins]="pluginsDonut" /></div>
           </article>
           <article class="chart-card chart-card--wide">
+            <h2 class="chart-card__title">{{ tituloConFacultad('Solicitudes por programa de vinculación') }}</h2>
+            <div class="chart-card__body chart-card__body--fill" [style.height.px]="alturaPrograma"><p-chart type="bar" [data]="chartPrograma" [options]="optsTipo" [plugins]="pluginsBarras" /></div>
+          </article>
+          <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por tipo de intervención</h2>
             <div class="chart-card__body chart-card__body--fill" [style.height.px]="alturaTipo"><p-chart type="bar" [data]="chartTipo" [options]="optsTipo" [plugins]="pluginsBarras" /></div>
           </article>
@@ -258,8 +262,29 @@
             <div class="chart-card__body"><p-chart type="bar" [data]="chartCarrera" [options]="optsBarra" [plugins]="pluginsBarras" /></div>
           </article>
           <article class="chart-card chart-card--wide">
-            <h2 class="chart-card__title">Solicitudes por comuna (top 10)</h2>
-            <div class="chart-card__body"><p-chart type="bar" [data]="chartComuna" [options]="optsBarraH" [plugins]="pluginsBarras" /></div>
+            <div class="chart-card__head">
+              <h2 class="chart-card__title">{{ tituloConFacultad(tituloUbicacion) }}</h2>
+              <div class="vista" role="group" aria-label="Ubicación de las solicitudes">
+                <button *ngFor="let v of vistasUbicacion" type="button" class="vista__btn"
+                        [class.vista__btn--activa]="vistaUbicacion === v.valor"
+                        [attr.aria-pressed]="vistaUbicacion === v.valor"
+                        (click)="cambiarVistaUbicacion(v.valor)">{{ v.label }}</button>
+              </div>
+            </div>
+            <div class="ubicacion-region" *ngIf="vistaUbicacion === 'region'">
+              <p-select
+                [options]="regionesConDatos"
+                [(ngModel)]="regionElegida"
+                placeholder="Elige una región para ver sus comunas"
+                [showClear]="true"
+                appendTo="body"
+                [style]="{ minWidth: '280px' }"
+                (onChange)="elegirRegion($event.value)"
+                (onClear)="elegirRegion(null)"
+              />
+              <span class="comparacion__hint" *ngIf="!regionElegida">También puedes hacer clic en una barra.</span>
+            </div>
+            <div class="chart-card__body chart-card__body--fill" [class.chart-clicable]="vistaUbicacion === 'region' && !regionElegida" [style.height.px]="alturaUbicacion"><p-chart type="bar" [data]="chartUbicacion" [options]="optsTipo" [plugins]="pluginsBarras" (onDataSelect)="seleccionarBarraUbicacion($event)" /></div>
           </article>
         </section>
 
@@ -319,34 +344,6 @@
                 </div>
               </div>
               <div class="chart-card__body"><p-chart type="line" [data]="chartHitos" [options]="optsLinea" [plugins]="pluginsHitos" /></div>
-            </article>
-          </section>
-
-          <section class="tables">
-            <article class="table-card">
-              <h2 class="chart-card__title">
-                Iniciativas detenidas (más de {{ seg.cuellosDeBotella.umbralDias }} días)
-                <span class="cuello__total">{{ seg.cuellosDeBotella.total }}</span>
-              </h2>
-              <div class="cuello__chips" *ngIf="seg.cuellosDeBotella.porEtapa.length">
-                <span class="cuello__chip" *ngFor="let e of seg.cuellosDeBotella.porEtapa">
-                  {{ e.etapa }}: <strong>{{ e.cantidad }}</strong>
-                </span>
-              </div>
-              <table class="rank">
-                <thead><tr><th>Iniciativa</th><th>Carrera</th><th>Etapa actual</th><th>Días</th></tr></thead>
-                <tbody>
-                  <tr *ngFor="let x of seg.cuellosDeBotella.items">
-                    <td>{{ x.titulo }}</td><td>{{ x.carrera }}</td><td>{{ x.etapa }}</td><td>{{ x.dias }}</td>
-                  </tr>
-                  <tr *ngIf="!seg.cuellosDeBotella.items.length">
-                    <td colspan="4" class="rank__empty">No hay iniciativas detenidas.</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p class="seccion__hint" *ngIf="seg.cuellosDeBotella.total > seg.cuellosDeBotella.items.length">
-                Se muestran las {{ seg.cuellosDeBotella.items.length }} más antiguas.
-              </p>
             </article>
           </section>
         </ng-container>

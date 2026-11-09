@@ -11,6 +11,8 @@
  * Crea: 7 facultades con sus carreras, 1 decano por facultad, 1 director de VCM,
  * gestores, 1 encargado por carrera, docentes, clientes, 150 alumnos voluntarios y
  * 600 solicitudes repartidas en planteamientos y proyectos (con historial de seguimiento).
+ * Cada solicitud queda asociada a uno de los programas de vinculación y a un alcance
+ * (regional, nacional o internacional). Los programas no se borran.
  * Contraseña de todos los usuarios creados: Demo1234
  */
 try { require('dotenv').config(); } catch (_) {}
@@ -91,6 +93,55 @@ const ORG = {
   PERSONA_NATURAL: [''], OTRO: ['Club','Comité','Cooperativa'],
 };
 const NOM_ORG = ['Los Aromos','El Maitén','Las Rosas','San Miguel','Esperanza','Nueva Aurora','Los Copihues','Santa Marta','El Roble','Vista Hermosa','Los Olivos','Villa Futuro','Andalién','Rayén','Mirador del Maule','Los Notros','Alborada','Piedra Azul'];
+// ─── Programas de vinculación y alcance territorial ─────────────────────────
+// [nombre, peso, orden]: los programas más conocidos reciben más solicitudes
+const PROGRAMAS = [
+  ['KineTransForma', 6, 1], ['Comercio Justo para el Desarrollo Rural', 7, 2], ['Tejiendo Redes', 9, 3],
+  ['Programa de Español para Migrantes', 5, 4], ['Club de Lectura del Adulto Mayor', 8, 5], ['Telecuidado UCM', 10, 6],
+  ['Escuela de Formación Comunitaria', 9, 7], ['Prosalud UCM', 14, 8], ['Programa de Educación Rural', 12, 9],
+  ['Akoluthía: Acompañando al Profesor de Religión en su Crecimiento Profesional', 4, 10],
+  ['Convivencia Escolar Formando Líderes para el Cambio', 8, 11], ['Clínica Jurídica UCM', 6, 12],
+  ['Jornadas de Didáctica de las Ciencias Experimentales', 4, 13],
+];
+// Comunas de otras regiones, para las solicitudes de alcance nacional
+const COMUNAS_NACIONAL = [
+  ['Metropolitana de Santiago', 5, ['Santiago', 'Maipú', 'Puente Alto', 'La Florida', 'Providencia', 'Ñuñoa']],
+  ['Biobío', 4, ['Concepción', 'Los Ángeles', 'Talcahuano', 'Coronel']],
+  ['Valparaíso', 3, ['Valparaíso', 'Viña del Mar', 'Quilpué', 'San Antonio']],
+  ['Ñuble', 3, ['Chillán', 'San Carlos', 'Bulnes']],
+  ["Libertador General Bernardo O'Higgins", 3, ['Rancagua', 'San Fernando', 'Rengo', 'Pichilemu']],
+  ['La Araucanía', 2, ['Temuco', 'Villarrica', 'Angol']],
+  ['Los Lagos', 1, ['Puerto Montt', 'Osorno', 'Castro']],
+  ['Coquimbo', 1, ['La Serena', 'Coquimbo', 'Ovalle']],
+  ['Antofagasta', 1, ['Antofagasta', 'Calama']],
+];
+// Países para las solicitudes de alcance internacional
+const PAISES = [
+  ['Argentina', 4, ['Mendoza', 'Buenos Aires', 'Neuquén']], ['Perú', 3, ['Lima', 'Arequipa']],
+  ['Colombia', 2, ['Bogotá', 'Medellín']], ['España', 2, ['Madrid', 'Valencia']],
+  ['México', 1, ['Ciudad de México', 'Guadalajara']], ['Ecuador', 1, ['Quito']],
+];
+/** Alcance de una solicitud: casi todas son regionales (comunas del Maule); algunas nacionales o internacionales. */
+function ubicacionAleatoria(comunaMaule) {
+  const alcance = pickW([['REGIONAL', 82], ['NACIONAL', 12], ['INTERNACIONAL', 6]]);
+  if (alcance === 'NACIONAL') {
+    const [region, , comunas] = pickW(COMUNAS_NACIONAL.map((r) => [r, r[1]]));
+    return { alcance, region, pais: 'Chile', ciudad: pick(comunas) };
+  }
+  if (alcance === 'INTERNACIONAL') {
+    const [pais, , ciudades] = pickW(PAISES.map((r) => [r, r[1]]));
+    return { alcance, region: null, pais, ciudad: pick(ciudades) };
+  }
+  return { alcance, region: 'Maule', pais: 'Chile', ciudad: comunaMaule };
+}
+/** Se asegura que existan los programas (la migración ya los carga) y se devuelven con su id. */
+async function cargarProgramas() {
+  await prisma.programa.createMany({ data: PROGRAMAS.map(([nombre, , orden]) => ({ nombre, orden })), skipDuplicates: true });
+  const filas = await prisma.programa.findMany({ select: { id: true, nombre: true } });
+  const idDe = new Map(filas.map((f) => [f.nombre, f.id]));
+  return PROGRAMAS.filter(([nombre]) => idDe.has(nombre)).map(([nombre, peso]) => [idDe.get(nombre), peso]);
+}
+
 const TIPOS = [['CHARLA',16],['TALLER',18],['CURSO_CAPACITACION',9],['SEMINARIO',7],['ASESORIA_TECNICA',14],['OPERATIVO_TERRENO',8],['APRENDIZAJE_SERVICIO',10],['ACTIVIDAD_CULTURAL',6],['VOLUNTARIADO',7],['INVESTIGACION_APLICADA',3],['OTRO',2]];
 const TIPO_TEXTO = { CHARLA:'Charla', TALLER:'Taller', CURSO_CAPACITACION:'Curso de capacitación', SEMINARIO:'Jornada', ASESORIA_TECNICA:'Asesoría técnica', OPERATIVO_TERRENO:'Operativo en terreno', APRENDIZAJE_SERVICIO:'Proyecto de aprendizaje-servicio', ACTIVIDAD_CULTURAL:'Actividad cultural', VOLUNTARIADO:'Voluntariado', INVESTIGACION_APLICADA:'Estudio aplicado', OTRO:'Actividad' };
 const TEMAS = ['salud preventiva','alfabetización digital','energías renovables','educación financiera','manejo de residuos','huertos comunitarios','primeros auxilios','nutrición infantil','orientación vocacional','derechos y deberes ciudadanos','seguridad en el hogar','apoyo escolar','envejecimiento activo','emprendimiento local','salud mental comunitaria','comprensión lectora','cuidado del agua','buenas prácticas agrícolas','ergonomía laboral','ciberseguridad básica','arte y expresión','deporte y vida saludable','mediación y convivencia','asesoría legal básica'];
@@ -170,6 +221,7 @@ async function main() {
   }
 
   // ── 4. Cadena solicitud → planteamiento → proyecto ──────────────────────────
+  const programas = await cargarProgramas();
   // Carreras con más actividad: ingeniería, salud, educación...
   const pesoCarrera = carreras.map((c, i) => [c, 1 + ((i * 7) % 5)]);
   const planes = []; // un plan por solicitud
@@ -177,7 +229,9 @@ async function main() {
     const carrera = pickW(pesoCarrera);
     const origenDocente = rand() < 0.12;
     const tipoCliente = origenDocente ? 'OTRO' : pickW(TIPOS_CLIENTE);
-    const ciudad = pickW(COMUNAS);
+    const ub = ubicacionAleatoria(pickW(COMUNAS));
+    const ciudad = ub.ciudad;
+    const programaId = pickW(programas);
     const tipoInt = pickW(TIPOS);
     const tema = pick(TEMAS);
     const pref = pick(ORG[tipoCliente]);
@@ -195,7 +249,7 @@ async function main() {
     // fecha de creación: lo "en curso" es reciente; lo cerrado se reparte en ~4,4 años
     const reciente = sol === 'PENDIENTE' || pla === 'PENDIENTE' || pla === null && sol === 'APROBADA' || pro === 'EN_PROCESO' || pro === 'PAUSADO' || pro === null && pla === 'APROBADO';
     const dias = reciente ? int(3, 130) : Math.floor(150 + Math.pow(rand(), 0.8) * 1450);
-    planes.push({ i, carrera, origenDocente, tipoCliente, ciudad, tipoInt, tema, nombreOrg, sol, pla, pro, creada: addDias(ahora, -dias) });
+    planes.push({ i, carrera, origenDocente, tipoCliente, ciudad, ub, programaId, tipoInt, tema, nombreOrg, sol, pla, pro, creada: addDias(ahora, -dias) });
   }
 
   const solData = planes.map((p) => {
@@ -206,6 +260,7 @@ async function main() {
     return {
       titulo: `${TIPO_TEXTO[p.tipoInt]} de ${p.tema} en ${p.ciudad} (${p.i + 1})`,
       descripcion: `Se solicita apoyo de la universidad para realizar una actividad sobre ${p.tema} dirigida a la comunidad de ${p.ciudad}. ${p.nombreOrg ? 'La solicitud proviene de ' + p.nombreOrg + '. ' : ''}Se espera contar con estudiantes y docentes que acompañen el proceso.`,
+      programaId: p.programaId, alcance: p.ub.alcance, region: p.ub.region, pais: p.ub.pais,
       ciudad: p.ciudad, direccion: `Calle ${pick(APELLIDOS)}`, numeroDireccion: String(int(10, 2500)), telefono: tel(),
       estado: p.sol, motivoRechazo: rechazada ? pick(MOTIVOS_SOL) : null,
       tipoCliente: p.tipoCliente, tipoClienteOtro: p.tipoCliente === 'OTRO' && !p.origenDocente ? 'Comité vecinal' : null,

@@ -6,7 +6,7 @@ export type AlcanceVinculacion = 'REGIONAL' | 'NACIONAL' | 'INTERNACIONAL';
 
 export const ALCANCE_LABELS: Record<AlcanceVinculacion, string> = {
   REGIONAL: 'Regional (región del Maule)',
-  NACIONAL: 'Nacional (otra región de Chile)',
+  NACIONAL: 'Nacional',
   INTERNACIONAL: 'Internacional',
 };
 
@@ -59,6 +59,8 @@ export interface Solicitud {
   editandoHasta?: string | null;
   nombreOrganizacion?: string | null;
   personasPrevistas?: number | null;
+  programaId?: number | null;
+  programa?: { id: number; nombre: string } | null;
   carreraId?: number;
   carrera?: Pick<Carrera, 'id' | 'nombre' | 'etiqueta'>;
   clienteId: number;

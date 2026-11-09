@@ -7,6 +7,8 @@
  * Todo lo que crea queda marcado para poder borrarlo sin tocar datos reales:
  *   - usuarios y alumnos con correo @demo.vcm.test
  *   - solicitudes con el título que empieza con "[DEMO]"
+ * Cada solicitud queda asociada a un programa de vinculación y a un alcance (regional, nacional o internacional).
+ * Requiere las migraciones aplicadas (tabla de programas y campo alcance).
  * Contraseña de todos los usuarios demo: Demo1234
  */
 try { require('dotenv').config(); } catch (_) { /* Prisma también lee el .env por su cuenta */ }
@@ -62,6 +64,57 @@ const COMUNAS = [
   ['Pelarco', 2], ['Colbún', 2], ['Teno', 2], ['Villa Alegre', 2], ['Longaví', 2],
   ['Río Claro', 1], ['Curepto', 1], ['Chanco', 1], ['Romeral', 1], ['Sagrada Familia', 1],
 ];
+
+const pickW = pickWeighted;
+
+// ─── Programas de vinculación y alcance territorial ─────────────────────────
+// [nombre, peso, orden]: los programas más conocidos reciben más solicitudes
+const PROGRAMAS = [
+  ['KineTransForma', 6, 1], ['Comercio Justo para el Desarrollo Rural', 7, 2], ['Tejiendo Redes', 9, 3],
+  ['Programa de Español para Migrantes', 5, 4], ['Club de Lectura del Adulto Mayor', 8, 5], ['Telecuidado UCM', 10, 6],
+  ['Escuela de Formación Comunitaria', 9, 7], ['Prosalud UCM', 14, 8], ['Programa de Educación Rural', 12, 9],
+  ['Akoluthía: Acompañando al Profesor de Religión en su Crecimiento Profesional', 4, 10],
+  ['Convivencia Escolar Formando Líderes para el Cambio', 8, 11], ['Clínica Jurídica UCM', 6, 12],
+  ['Jornadas de Didáctica de las Ciencias Experimentales', 4, 13],
+];
+// Comunas de otras regiones, para las solicitudes de alcance nacional
+const COMUNAS_NACIONAL = [
+  ['Metropolitana de Santiago', 5, ['Santiago', 'Maipú', 'Puente Alto', 'La Florida', 'Providencia', 'Ñuñoa']],
+  ['Biobío', 4, ['Concepción', 'Los Ángeles', 'Talcahuano', 'Coronel']],
+  ['Valparaíso', 3, ['Valparaíso', 'Viña del Mar', 'Quilpué', 'San Antonio']],
+  ['Ñuble', 3, ['Chillán', 'San Carlos', 'Bulnes']],
+  ["Libertador General Bernardo O'Higgins", 3, ['Rancagua', 'San Fernando', 'Rengo', 'Pichilemu']],
+  ['La Araucanía', 2, ['Temuco', 'Villarrica', 'Angol']],
+  ['Los Lagos', 1, ['Puerto Montt', 'Osorno', 'Castro']],
+  ['Coquimbo', 1, ['La Serena', 'Coquimbo', 'Ovalle']],
+  ['Antofagasta', 1, ['Antofagasta', 'Calama']],
+];
+// Países para las solicitudes de alcance internacional
+const PAISES = [
+  ['Argentina', 4, ['Mendoza', 'Buenos Aires', 'Neuquén']], ['Perú', 3, ['Lima', 'Arequipa']],
+  ['Colombia', 2, ['Bogotá', 'Medellín']], ['España', 2, ['Madrid', 'Valencia']],
+  ['México', 1, ['Ciudad de México', 'Guadalajara']], ['Ecuador', 1, ['Quito']],
+];
+/** Alcance de una solicitud: casi todas son regionales (comunas del Maule); algunas nacionales o internacionales. */
+function ubicacionAleatoria(comunaMaule) {
+  const alcance = pickW([['REGIONAL', 82], ['NACIONAL', 12], ['INTERNACIONAL', 6]]);
+  if (alcance === 'NACIONAL') {
+    const [region, , comunas] = pickW(COMUNAS_NACIONAL.map((r) => [r, r[1]]));
+    return { alcance, region, pais: 'Chile', ciudad: pick(comunas) };
+  }
+  if (alcance === 'INTERNACIONAL') {
+    const [pais, , ciudades] = pickW(PAISES.map((r) => [r, r[1]]));
+    return { alcance, region: null, pais, ciudad: pick(ciudades) };
+  }
+  return { alcance, region: 'Maule', pais: 'Chile', ciudad: comunaMaule };
+}
+/** Se asegura que existan los programas (la migración ya los carga) y se devuelven con su id. */
+async function cargarProgramas() {
+  await prisma.programa.createMany({ data: PROGRAMAS.map(([nombre, , orden]) => ({ nombre, orden })), skipDuplicates: true });
+  const filas = await prisma.programa.findMany({ select: { id: true, nombre: true } });
+  const idDe = new Map(filas.map((f) => [f.nombre, f.id]));
+  return PROGRAMAS.filter(([nombre]) => idDe.has(nombre)).map(([nombre, peso]) => [idDe.get(nombre), peso]);
+}
 
 const TIPOS = [
   ['CHARLA', 16], ['TALLER', 18], ['CURSO_CAPACITACION', 9], ['SEMINARIO', 7],
@@ -147,9 +200,11 @@ async function main() {
   });
 
   // ── Solicitudes ───────────────────────────────────────────────────────────
+  const programas = await cargarProgramas();
   const solicitudesData = [];
   for (let i = 1; i <= N_SOLICITUDES; i++) {
-    const ciudad = pickWeighted(COMUNAS);
+    const ub = ubicacionAleatoria(pickWeighted(COMUNAS));
+    const ciudad = ub.ciudad;
     // más solicitudes en los meses recientes (tendencia de crecimiento)
     const dias = Math.floor(420 * (1 - Math.sqrt(rand())));
     const createdAt = addDias(ahora, -dias - rand());
@@ -158,7 +213,9 @@ async function main() {
     solicitudesData.push({
       titulo: `[DEMO] ${pick(['Apoyo en','Capacitación en','Taller de','Asesoría en','Charla sobre'])} ${pick(TEMAS)} - ${ciudad} (${i})`,
       descripcion: `Solicitud de demostración. La organización requiere apoyo en ${pick(TEMAS)} para beneficiarios de ${ciudad}.`,
-      ciudad, direccion: `Calle ${int(1, 99)}`, numeroDireccion: String(int(10, 2999)),
+      programaId: pickW(programas),
+      alcance: ub.alcance, ciudad, region: ub.region, pais: ub.pais,
+      direccion: `Calle ${int(1, 99)}`, numeroDireccion: String(int(10, 2999)),
       telefono: `+569${int(10000000, 99999999)}`,
       estado, carreraId: pickWeighted(carreraPeso), clienteId: pick(clientes).id,
       createdAt, updatedAt,

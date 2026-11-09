@@ -548,3 +548,18 @@
 
   i { font-size: 1.2rem; flex-shrink: 0; }
 }
+
+// Tarjeta con la información del programa de vinculación elegido
+.programa-card {
+  margin-top: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--ucm-borde, #e2e8f0);
+  border-left: 4px solid var(--ucm-celeste, #2a9d8f);
+  border-radius: 8px;
+  background: #f8fafc;
+
+  &__titulo { display: block; font-size: 0.9rem; color: var(--ucm-azul, #1e3a5f); }
+  &__texto { margin: 0.35rem 0 0; font-size: 0.85rem; line-height: 1.45; color: #475569; }
+  &__texto--vacio { font-style: italic; color: #94a3b8; }
+  &__lista { margin: 0.45rem 0 0; padding-left: 1.1rem; font-size: 0.83rem; color: #475569; li { margin: 0.15rem 0; } }
+}

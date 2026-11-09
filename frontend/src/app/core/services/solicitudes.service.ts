@@ -10,6 +10,7 @@ import { PaginatedResponse } from '../models/paginated-response.model';
 export interface CreateSolicitudDto {
   titulo: string;
   descripcion: string;
+  programaId: number;
   alcance: AlcanceVinculacion;
   ciudad?: string | null;
   region?: string | null;
@@ -27,6 +28,7 @@ export interface CreateSolicitudDto {
 export interface UpdateSolicitudDto {
   titulo?: string;
   descripcion?: string;
+  programaId?: number;
   alcance?: AlcanceVinculacion;
   ciudad?: string | null;
   region?: string | null;

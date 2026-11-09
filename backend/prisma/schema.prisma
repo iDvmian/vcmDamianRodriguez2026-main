@@ -170,6 +170,18 @@ model AlumnoVoluntario {
   createdAt DateTime         @default(now())
 }
 
+/// Programas de Vinculación con el Medio de la universidad; toda solicitud se asocia a uno
+model Programa {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique @db.VarChar(200)
+  descripcion String?     @db.Text
+  /// Actividades clave del programa, una por línea
+  actividades String?     @db.Text
+  orden       Int         @default(0)
+  activo      Boolean     @default(true)
+  solicitudes Solicitud[]
+}
+
 model Solicitud {
   id          Int               @id @default(autoincrement())
   titulo      String
@@ -190,6 +202,8 @@ model Solicitud {
   personasPrevistas  Int?
   carreraId   Int?
   carrera     Carrera?          @relation(fields: [carreraId], references: [id])
+  programaId  Int?
+  programa    Programa?         @relation(fields: [programaId], references: [id])
   clienteId   Int
   cliente     User              @relation("ClienteSolicitud", fields: [clienteId], references: [id])
   archivos    ArchivoSolicitud[]

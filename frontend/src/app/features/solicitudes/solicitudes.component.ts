@@ -13,12 +13,15 @@ import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { SolicitudesService, CreateSolicitudDto, UpdateSolicitudDto, GestionarSolicitudDto } from '../../core/services/solicitudes.service';
+import { ProgramasService } from '../../core/services/programas.service';
+import { Programa } from '../../core/models/programa.model';
 import { CarrerasService } from '../../core/services/carreras.service';
 import { UsuariosService } from '../../core/services/usuarios.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Solicitud, EstadoSolicitud, TIPO_CLIENTE_LABELS, TipoCliente, ALCANCE_OPCIONES } from '../../core/models/solicitud.model';
 import { REGIONES_FUERA_DEL_MAULE } from '../../core/constants/regiones-chile';
 import { COMUNAS_POR_REGION } from '../../core/constants/comunas-chile';
+import { PAISES } from '../../core/constants/paises';
 import { COMUNAS_MAULE } from '../../core/constants/comunas-maule';
 
 
@@ -121,6 +124,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
   }
   readonly comunasMaule = COMUNAS_MAULE;
   readonly regionesChile = REGIONES_FUERA_DEL_MAULE;
+  readonly paises = PAISES;
   readonly alcances = ALCANCE_OPCIONES;
 
   readonly ordenOptions = [
@@ -209,6 +213,20 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private route = inject(ActivatedRoute);
   private usuariosService = inject(UsuariosService);
+  private programasService = inject(ProgramasService);
+
+  /** Programas de vinculación entre los que el solicitante debe elegir. */
+  programas: Programa[] = [];
+
+  get programaElegido(): Programa | null {
+    const id = this.form.get('programaId')?.value;
+    return this.programas.find((p) => p.id === id) ?? null;
+  }
+
+  /** Actividades del programa como lista (se guardan una por línea). */
+  actividadesDe(p: Programa | null): string[] {
+    return (p?.actividades ?? '').split('\n').map((a) => a.trim()).filter(Boolean);
+  }
 
   /** Teléfono del perfil: se usa para prellenar el contacto de una solicitud nueva. */
   private telefonoPerfil = '';
@@ -224,6 +242,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form = this.fb.group({
       titulo: ['', [Validators.required, Validators.maxLength(140)]],
       descripcion: ['', [Validators.required, Validators.maxLength(560)]],
+      programaId: [null, Validators.required],
       alcance: ['REGIONAL', Validators.required],
       ciudad: [null, Validators.required],
       region: [null],
@@ -357,6 +376,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       this.refrescoTimer = setInterval(() => this.refrescar(), 30000);
     }
     this.loadCarrerasDropdown();
+    this.programasService.getProgramas().subscribe({
+      next: (p) => { this.programas = p; this.cdr.detectChanges(); },
+      error: () => {},
+    });
     this.loadItems();
     if (this.canCreateSolicitud) {
       this.usuariosService.getMiPerfil().subscribe({
@@ -500,6 +523,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
+      programaId: item.programaId ?? null,
       alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
       region: item.region ?? null,
@@ -528,7 +552,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     };
     poner('ciudad', a === 'REGIONAL' || a === 'NACIONAL' ? [Validators.required] : [Validators.maxLength(100)]);
     poner('region', a === 'NACIONAL' ? [Validators.required] : []);
-    poner('pais', a === 'INTERNACIONAL' ? [Validators.required, Validators.pattern(/\S/), Validators.maxLength(100)] : [Validators.maxLength(100)]);
+    poner('pais', a === 'INTERNACIONAL' ? [Validators.required] : []);
     poner('direccion', a === 'REGIONAL' ? [Validators.required, Validators.maxLength(150)] : [Validators.maxLength(150)]);
   }
 
@@ -590,6 +614,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
+      programaId: item.programaId ?? null,
       alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
       region: item.region ?? null,
@@ -627,6 +652,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: UpdateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
+        programaId: raw.programaId,
         alcance: raw.alcance,
         ciudad: raw.ciudad || null,
         region: raw.region || null,
@@ -650,6 +676,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: CreateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
+        programaId: raw.programaId,
         alcance: raw.alcance,
         ciudad: raw.ciudad || null,
         region: raw.region || null,
@@ -789,6 +816,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
         this.form.patchValue({
           titulo: actual.titulo,
           descripcion: actual.descripcion,
+          programaId: actual.programaId ?? null,
           alcance: actual.alcance ?? 'REGIONAL',
           ciudad: actual.ciudad ?? null,
           region: actual.region ?? null,

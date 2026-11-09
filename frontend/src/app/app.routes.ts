@@ -35,6 +35,17 @@ export const routes: Routes = [
           import('./features/facultades/facultades.component').then(m => m.FacultadesComponent),
       },
       {
+        path: 'dashboard/programas',
+        loadComponent: () =>
+          import('./features/programas-catalogo/programas-catalogo.component').then(m => m.ProgramasCatalogoComponent),
+      },
+      {
+        path: 'dashboard/programas/administrar',
+        canActivate: [soloRolesGuard('ADMIN', 'GESTOR_VCM', 'DIRECTOR_VCM')],
+        loadComponent: () =>
+          import('./features/programas/programas.component').then(m => m.ProgramasComponent),
+      },
+      {
         path: 'dashboard/carreras',
         canActivate: [soloRolesGuard('ADMIN', 'GESTOR_VCM', 'DIRECTOR_VCM', 'DECANO')],
         loadComponent: () =>
