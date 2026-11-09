@@ -1,2 +1,4 @@
--- RenameIndex
-ALTER TABLE `programa` RENAME INDEX `programa_nombre_key` TO `Programa_nombre_key`;
+-- Sin cambios: el índice único de `Programa` ya se crea como `Programa_nombre_key`
+-- en la migración 20261109120000_agregar_programas (nombres de tabla con la misma
+-- capitalización que el esquema de Prisma, necesaria en MySQL sobre Linux).
+SELECT 1;

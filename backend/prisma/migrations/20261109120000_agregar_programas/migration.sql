@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE `programa` (
+CREATE TABLE `Programa` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `nombre` VARCHAR(200) NOT NULL,
     `descripcion` TEXT NULL,
@@ -7,18 +7,18 @@ CREATE TABLE `programa` (
     `orden` INTEGER NOT NULL DEFAULT 0,
     `activo` BOOLEAN NOT NULL DEFAULT true,
 
-    UNIQUE INDEX `programa_nombre_key`(`nombre`),
+    UNIQUE INDEX `Programa_nombre_key`(`nombre`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AlterTable
-ALTER TABLE `solicitud` ADD COLUMN `programaId` INTEGER NULL;
+ALTER TABLE `Solicitud` ADD COLUMN `programaId` INTEGER NULL;
 
 -- AddForeignKey
-ALTER TABLE `solicitud` ADD CONSTRAINT `Solicitud_programaId_fkey` FOREIGN KEY (`programaId`) REFERENCES `programa`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `Solicitud` ADD CONSTRAINT `Solicitud_programaId_fkey` FOREIGN KEY (`programaId`) REFERENCES `Programa`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Programas de Vinculación con el Medio de la universidad
-INSERT INTO `programa` (`nombre`, `orden`) VALUES
+INSERT INTO `Programa` (`nombre`, `orden`) VALUES
   ('KineTransForma', 1),
   ('Comercio Justo para el Desarrollo Rural', 2),
   ('Tejiendo Redes', 3),
