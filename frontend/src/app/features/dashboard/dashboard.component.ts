@@ -377,6 +377,15 @@ export class DashboardComponent implements OnInit {
     },
   };
 
+  /** Igual que optsTipo, pero sin leyenda de series: aquí el color identifica cada tipo (clara = planteamientos, oscura = proyectos). */
+  readonly optsTipoColor = {
+    ...this.optsTipo,
+    plugins: { ...this.optsTipo.plugins, legend: { display: false } },
+  };
+
+  /** Un color por tipo de intervención; la barra de planteamientos usa el mismo tono más claro. */
+  private readonly PALETA_TIPOS = ['#1B3D8C', '#0E9F6E', '#E8590C', '#7C3AED', '#0891B2', '#D6336C', '#B7791F', '#4B5563'];
+
   /** Alto del gráfico por tipo: crece con la cantidad de tipos para que las barras no queden apretadas. */
   get alturaTipo(): number {
     const n = this.chartTipo?.labels?.length ?? 0;
@@ -757,11 +766,19 @@ export class DashboardComponent implements OnInit {
     const tipos = [...d.porTipoIntervencion].sort(
       (a, b) => b.planteamientos - a.planteamientos || b.proyectos - a.proyectos,
     );
+    const totalPlant = tipos.reduce((a, t) => a + t.planteamientos, 0);
+    const colores = tipos.map((_, i) => this.PALETA_TIPOS[i % this.PALETA_TIPOS.length]);
     this.chartTipo = {
-      labels: tipos.map((t) => this.tipoLabel(t.tipo)),
+      // Nombre partido en líneas + porcentaje del total de planteamientos
+      labels: tipos.map((t) => {
+        const pct = totalPlant ? ` · ${DashboardComponent.fmtPct((t.planteamientos / totalPlant) * 100)}` : '';
+        const lineas = this.partirNombre(this.tipoLabel(t.tipo), 28);
+        lineas[lineas.length - 1] += pct;
+        return lineas;
+      }),
       datasets: [
-        { label: 'Planteamientos', data: tipos.map((t) => t.planteamientos), backgroundColor: CELESTE },
-        { label: 'Proyectos', data: tipos.map((t) => t.proyectos), backgroundColor: AZUL },
+        { label: 'Planteamientos', data: tipos.map((t) => t.planteamientos), backgroundColor: colores.map((c) => c + '55'), borderColor: colores, borderWidth: 1 },
+        { label: 'Proyectos', data: tipos.map((t) => t.proyectos), backgroundColor: colores },
       ],
     };
 
@@ -786,6 +803,25 @@ export class DashboardComponent implements OnInit {
     this.armarChartUbicacion(d);
 
     this.armarSeguimiento(d);
+  }
+
+  /** Intensidad (0.25–1) del color de cada etapa del flujo según su cantidad respecto de la primera. */
+  intensidadEtapa(cuenta: number, base: number): number {
+    return base ? Math.max(0.25, Math.min(1, cuenta / base)) : 0.25;
+  }
+
+  /** Transición del flujo donde más solicitudes se pierden (solo si hay pérdida real). */
+  get etapaCritica(): { desde: string; hasta: string; pct: number; perdidas: number } | null {
+    const e = this.data?.seguimiento?.embudo;
+    if (!e || e.length < 2) return null;
+    let peor: { desde: string; hasta: string; pct: number; perdidas: number } | null = null;
+    for (let i = 1; i < e.length; i++) {
+      const perdidas = e[i - 1].cuenta - e[i].cuenta;
+      if (perdidas > 0 && (!peor || perdidas > peor.perdidas)) {
+        peor = { desde: e[i - 1].label, hasta: e[i].label, pct: e[i].pctDelPaso, perdidas };
+      }
+    }
+    return peor;
   }
 
   /** Indicadores del seguimiento de cada fase (embudo, tiempos, rechazos e hitos por mes). */

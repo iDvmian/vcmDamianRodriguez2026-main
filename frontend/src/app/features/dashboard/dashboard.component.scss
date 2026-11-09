@@ -509,3 +509,20 @@
 }
 
 .chart-clicable ::ng-deep canvas { cursor: pointer; }
+
+/* Avance por etapa: tarjetas planas unidas por el % que continúa */
+.flujo__hint { margin: -4px 0 14px; font-size: 12px; color: #6b7280; }
+.flujo { display: flex; align-items: stretch; flex-wrap: wrap; gap: 8px 0; }
+.flujo__tarjeta {
+  flex: 1 1 110px; min-width: 110px; display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 12px;
+  background: #fff; border: 1px solid var(--ucm-borde); border-radius: 12px;
+}
+.flujo__label { font-size: 12px; font-weight: 600; color: #6b7280; line-height: 1.25; min-height: 30px; }
+.flujo__num { font-size: 28px; font-weight: 700; color: #1b3d8c; line-height: 1; }
+.flujo__barra { height: 6px; border-radius: 999px; background: #eef1f5; overflow: hidden; }
+.flujo__barra span { display: block; height: 100%; border-radius: 999px; background: #29abe2; }
+.flujo__total { font-size: 11.5px; color: #6b7280; }
+.flujo__flecha { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 44px; color: #9ca3af; }
+.flujo__pct { font-size: 11.5px; font-weight: 700; color: #4b5563; }
+.flujo__sig { font-size: 22px; line-height: 1; }
+.flujo__flecha--alerta .flujo__pct, .flujo__flecha--alerta .flujo__sig { color: #dc2626; }

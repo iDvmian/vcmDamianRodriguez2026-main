@@ -163,7 +163,7 @@
         <article class="kpi">
           <span class="kpi__label">Tiempo de respuesta</span>
           <span class="kpi__value">{{ fmt(d.resumen.tiempoRespuestaPromedioDias, ' días') }}</span>
-          <span class="kpi__note">Promedio hasta aprobar o rechazar una solicitud (aproximado)</span>
+          <span class="kpi__note">Promedio hasta aprobar o rechazar una solicitud</span>
         </article>
       </section>
 
@@ -255,7 +255,8 @@
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por tipo de intervención</h2>
-            <div class="chart-card__body chart-card__body--fill" [style.height.px]="alturaTipo"><p-chart type="bar" [data]="chartTipo" [options]="optsTipo" [plugins]="pluginsBarras" /></div>
+            <p style="margin:-4px 0 8px;font-size:12px;color:#6b7280">Cada tipo tiene su color: barra clara = planteamientos, barra oscura = proyectos. El % es la parte del total de planteamientos.</p>
+            <div class="chart-card__body chart-card__body--fill" [style.height.px]="alturaTipo"><p-chart type="bar" [data]="chartTipo" [options]="optsTipoColor" [plugins]="pluginsBarras" /></div>
           </article>
           <article class="chart-card chart-card--wide">
             <h2 class="chart-card__title">Por carrera</h2>
@@ -296,13 +297,21 @@
           </p>
           <section class="charts">
             <article class="chart-card chart-card--wide">
-              <h2 class="chart-card__title">Embudo de la iniciativa</h2>
-              <div class="chart-card__body"><p-chart type="bar" [data]="chartEmbudo" [options]="optsBarraH" [plugins]="pluginsBarras" /></div>
-              <div class="embudo">
-                <span *ngFor="let p of seg.embudo; let i = index" class="embudo__item">
-                  {{ p.label }}: <strong>{{ p.pctDelTotal }}%</strong>
-                  <ng-container *ngIf="i > 0"> del total · {{ p.pctDelPaso }}% del paso anterior</ng-container>
-                </span>
+              <h2 class="chart-card__title">Avance de las solicitudes por etapa</h2>
+              <p class="flujo__hint">Cuántas solicitudes llegan a cada etapa del proceso. Entre etapas se indica qué porcentaje continúa.</p>
+              <div class="flujo">
+                <ng-container *ngFor="let p of seg.embudo; let i = index">
+                  <div class="flujo__flecha" *ngIf="i > 0" [class.flujo__flecha--alerta]="p.pctDelPaso < 50">
+                    <span class="flujo__pct">{{ p.pctDelPaso }}%</span>
+                    <span class="flujo__sig">›</span>
+                  </div>
+                  <div class="flujo__tarjeta">
+                    <span class="flujo__label">{{ p.label }}</span>
+                    <span class="flujo__num">{{ p.cuenta }}</span>
+                    <div class="flujo__barra"><span [style.width.%]="p.pctDelTotal"></span></div>
+                    <span class="flujo__total">{{ p.pctDelTotal }}% del total</span>
+                  </div>
+                </ng-container>
               </div>
             </article>
             <article class="chart-card">
@@ -351,7 +360,12 @@
         <!-- Rankings -->
         <section class="tables">
           <article class="table-card table-card--full">
-            <h2 class="chart-card__title">Docentes más activos</h2>
+            <div class="chart-card__head">
+              <h2 class="chart-card__title">Docentes más activos</h2>
+              <button type="button" class="btn-print" title="Imprimir esta tabla" (click)="imprimirTabla($event, 'Docentes más activos')">
+                <i class="ti ti-printer"></i> Imprimir
+              </button>
+            </div>
             <table class="rank">
               <thead>
                 <tr><th>#</th><th>Docente</th><th>Carrera</th><th>Facultad</th><th>Planteam.</th><th>Aprobados</th><th>Proyectos</th><th>Horas hombre</th></tr>

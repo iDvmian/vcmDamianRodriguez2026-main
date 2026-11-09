@@ -130,14 +130,8 @@ export class DashboardService {
 
     // ── Solicitudes ──────────────────────────────────────────────────────────
     const solPorEstado = { PENDIENTE: 0, APROBADA: 0, RECHAZADA: 0 };
-    let sumaRespuestaMs = 0;
-    let respondidas = 0;
     for (const s of solicitudes) {
       solPorEstado[s.estado]++;
-      if (s.estado !== 'PENDIENTE') {
-        sumaRespuestaMs += s.updatedAt.getTime() - s.createdAt.getTime();
-        respondidas++;
-      }
     }
 
     // ── Planteamientos y proyectos ───────────────────────────────────────────
@@ -314,6 +308,10 @@ export class DashboardService {
     }
     const rankingAlumnos = [...alumnos.values()].sort((a, b) => b.proyectos - a.proyectos).slice(0, 10);
 
+    // Tiempo de respuesta real: de SOLICITUD_CREADA a SOLICITUD_APROBADA/RECHAZADA según el historial de etapas
+    const seguimiento = await this.calcularSeguimiento(solicitudes);
+    const tiempoRespuestaReal = seguimiento.tiempos.find((t) => t.clave === 'evaluacion_solicitud')?.promedioDias ?? null;
+
     const totalSol = solicitudes.length;
     const data = {
       resumen: {
@@ -340,7 +338,7 @@ export class DashboardService {
         participantes: { ...participantes, total: participantes.docentes + participantes.estudiantes + participantes.docentesExternos + participantes.alumnosExternos + participantes.otrosExternos },
         alumnosVoluntarios: alumnosSet.size,
         duracionPromedioDias: proyectos.length ? round1(sumaDuracionMs / proyectos.length / DIA_MS) : null,
-        tiempoRespuestaPromedioDias: respondidas ? round1(sumaRespuestaMs / respondidas / DIA_MS) : null,
+        tiempoRespuestaPromedioDias: tiempoRespuestaReal,
       },
       porMes,
       porFacultad,
@@ -351,7 +349,7 @@ export class DashboardService {
       porUbicacion,
       rankingDocentes,
       rankingAlumnos,
-      seguimiento: await this.calcularSeguimiento(solicitudes),
+      seguimiento,
     };
 
     return { data, message: 'Dashboard obtenido exitosamente', statusCode: 200 };
