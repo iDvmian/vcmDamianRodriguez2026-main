@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsInt, IsOptional, ArrayUnique, Min, Max } from 'class-validator';
+import { IsArray, IsDateString, IsInt, IsOptional, ArrayUnique, ArrayMaxSize, ArrayMinSize, ValidateNested, Min, Max } from 'class-validator';
+import { CreateCostoDto } from './create-costo.dto';
 
 export class CreateProyectoDto {
   @ApiProperty({ example: 1 })
@@ -63,4 +64,12 @@ export class CreateProyectoDto {
   @Max(100000)
   @Type(() => Number)
   participantesOtrosExternos?: number;
+
+  @ApiProperty({ type: [CreateCostoDto], description: 'Desglose de costos (ingresos y gastos): al menos una línea' })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Debes registrar al menos una línea de costo' })
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => CreateCostoDto)
+  costos: CreateCostoDto[];
 }

@@ -25,6 +25,76 @@
       [style]="{ 'min-width': '200px' }"
       appendTo="body"
     />
+    <p-select
+      *ngIf="useAllEndpoint"
+      [(ngModel)]="filtroFacultadId"
+      (ngModelChange)="onFacultadFiltroChange()"
+      [options]="facultadFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Facultad"
+      [showClear]="true"
+      [filter]="true" [style]="{ 'min-width': '260px' }"
+      appendTo="body"
+    />
+    <p-select
+      *ngIf="useAllEndpoint"
+      [(ngModel)]="filtroCarreraId"
+      (ngModelChange)="onFilterChange()"
+      [options]="carreraFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Carrera"
+      [showClear]="true"
+      [filter]="true" [style]="{ 'min-width': '260px' }"
+      appendTo="body"
+    />
+    <p-select
+      [(ngModel)]="filtroTipo"
+      (ngModelChange)="onFilterChange()"
+      [options]="tipoFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Tipo de intervención"
+      [showClear]="true"
+      [style]="{ 'min-width': '220px' }"
+      appendTo="body"
+    />
+    <p-select
+      [(ngModel)]="filtroProgramaId"
+      (ngModelChange)="onFilterChange()"
+      [options]="programaFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Programa"
+      [showClear]="true"
+      [filter]="true" [style]="{ 'min-width': '200px' }"
+      appendTo="body"
+    />
+    <p-select
+      [(ngModel)]="filtroAlcance"
+      (ngModelChange)="onFilterChange()"
+      [options]="alcanceFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Alcance"
+      [showClear]="true"
+      [style]="{ 'min-width': '160px' }"
+      appendTo="body"
+    />
+    <p-select
+      *ngIf="puedeFiltrarDocente"
+      [(ngModel)]="filtroDocenteId"
+      (ngModelChange)="onFilterChange()"
+      [options]="docenteFiltroOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Docente"
+      [showClear]="true"
+      [filter]="true"
+      [style]="{ 'min-width': '200px' }"
+      appendTo="body"
+    />
     <button class="btn-secondary" type="button" (click)="clearFilters()">
       <i class="ti ti-filter-off"></i>
       Limpiar filtros
@@ -50,8 +120,9 @@
           <th class="col-estado">Estado</th>
           <th class="col-fecha">Fecha Inicio</th>
           <th class="col-fecha">Fecha Fin</th>
-          <th class="col-alumnos">Nº Alumnos</th>
+          <th class="col-alumnos">Alumnos</th>
           <th *ngIf="showDocenteColumn" class="col-docente">Docente</th>
+          <th class="col-costo">Costo</th>
           <th class="col-actions">Acciones</th>
         </tr>
       </ng-template>
@@ -73,6 +144,10 @@
             [title]="getDocenteNombre(proy)"
           >
             {{ getDocenteNombre(proy) }}
+          </td>
+          <td class="col-costo" [title]="'Ingresos − gastos del proyecto'">
+            <span *ngIf="saldoProyecto(proy) as c; else sinCosto" [class.costo--pos]="c.saldo > 0" [class.costo--neg]="c.saldo < 0">{{ fmtSaldo(c.saldo) }}</span>
+            <ng-template #sinCosto><span class="text-muted">—</span></ng-template>
           </td>
           <td class="col-actions">
             <div class="action-cell">
@@ -110,7 +185,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="showDocenteColumn ? 7 : 6">
+          <td [attr.colspan]="showDocenteColumn ? 8 : 7">
             <div class="empty-cell">
               <i class="ti ti-inbox"></i>
               Sin proyectos registrados
@@ -186,35 +261,19 @@
         </small>
       </div>
 
-      <!-- Participantes de la intervención -->
+      <!-- Personas alcanzadas: solo el total; el desglose se abre aparte -->
       <div class="field field--full">
-        <label class="field__label">Personas alcanzadas por la intervención</label>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-          <div>
-            <small class="field__hint">Docentes</small>
-            <input type="number" min="0" formControlName="participantesDocentes" placeholder="0" class="field__input field__date field__number" />
-          </div>
-          <div>
-            <small class="field__hint">Estudiantes</small>
-            <input type="number" min="0" formControlName="participantesEstudiantes" placeholder="0" class="field__input field__date field__number" />
-          </div>
-          <div>
-            <small class="field__hint">Docentes externos</small>
-            <input type="number" min="0" formControlName="participantesDocentesExternos" placeholder="0" class="field__input field__date field__number" />
-          </div>
-          <div>
-            <small class="field__hint">Alumnos externos</small>
-            <input type="number" min="0" formControlName="participantesAlumnosExternos" placeholder="0" class="field__input field__date field__number" />
-          </div>
-          <div>
-            <small class="field__hint">Otros externos (comunidad, vecinos)</small>
-            <input type="number" min="0" formControlName="participantesOtrosExternos" placeholder="0" class="field__input field__date field__number" />
-          </div>
+        <label class="field__label">Personas alcanzadas por la intervención <span *ngIf="!editingItem" class="required">*</span></label>
+        <div class="resumen" [class.resumen--error]="faltaPersonas && totalParticipantes <= 0">
+          <span class="resumen__valor">{{ totalParticipantes }} <small>personas</small></span>
+          <button type="button" class="resumen__btn" (click)="personasDialogVisible = true">
+            <i class="ti ti-list-details"></i> Desglosar
+          </button>
         </div>
-        <small class="field__hint">Total: {{ totalParticipantes }} personas</small>
+        <small class="field__error" *ngIf="faltaPersonas && totalParticipantes <= 0">Las personas alcanzadas son obligatorias</small>
         <small class="field__error"
           *ngIf="(form.get('participantesDocentes')?.invalid || form.get('participantesEstudiantes')?.invalid || form.get('participantesDocentesExternos')?.invalid || form.get('participantesAlumnosExternos')?.invalid || form.get('participantesOtrosExternos')?.invalid)">
-          Ingresa números enteros entre 0 y 100000
+          Revisa el desglose: números enteros entre 0 y 100000
         </small>
       </div>
 
@@ -241,7 +300,137 @@
         </small>
       </div>
 
+      <!-- Costo total: solo el resultado; el desglose se abre aparte (solo al crear) -->
+      <div class="field field--full" *ngIf="!editingItem">
+        <label class="field__label">Costo del proyecto <span class="required">*</span></label>
+        <div class="resumen" [class.resumen--error]="faltaCostos && nuevosCostos.length === 0">
+          <span class="resumen__valor"
+            [class.costos__monto--ingreso]="totalesNuevosCostos.saldo > 0"
+            [class.costos__monto--gasto]="totalesNuevosCostos.saldo < 0">
+            {{ nuevosCostos.length ? fmtSaldo(totalesNuevosCostos.saldo) : '$0' }}
+            <small>{{ nuevosCostos.length }} {{ nuevosCostos.length === 1 ? 'línea' : 'líneas' }}</small>
+          </span>
+          <button type="button" class="resumen__btn" (click)="costosDialogVisible = true">
+            <i class="ti ti-coin"></i> Desglosar
+          </button>
+        </div>
+        <small class="field__error" *ngIf="faltaCostos && nuevosCostos.length === 0">Registra al menos una línea de costo</small>
+      </div>
+
     </div>
+
+    <!-- Sub-formulario: desglose de personas alcanzadas -->
+    <p-dialog
+      [(visible)]="personasDialogVisible"
+      [modal]="true"
+      [draggable]="false"
+      [resizable]="false"
+      [style]="{ width: '480px' }"
+      header="Personas alcanzadas"
+      appendTo="body"
+    >
+      <p class="field__hint" style="margin-bottom: 10px;">Indica cuántas personas de cada grupo alcanzó la intervención.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <div>
+            <small class="field__hint">Docentes</small>
+            <input type="number" min="0" formControlName="participantesDocentes" placeholder="0" class="field__input field__date field__number" />
+          </div>
+          <div>
+            <small class="field__hint">Estudiantes</small>
+            <input type="number" min="0" formControlName="participantesEstudiantes" placeholder="0" class="field__input field__date field__number" />
+          </div>
+          <div>
+            <small class="field__hint">Docentes externos</small>
+            <input type="number" min="0" formControlName="participantesDocentesExternos" placeholder="0" class="field__input field__date field__number" />
+          </div>
+          <div>
+            <small class="field__hint">Alumnos externos</small>
+            <input type="number" min="0" formControlName="participantesAlumnosExternos" placeholder="0" class="field__input field__date field__number" />
+          </div>
+          <div>
+            <small class="field__hint">Otros externos (comunidad, vecinos)</small>
+            <input type="number" min="0" formControlName="participantesOtrosExternos" placeholder="0" class="field__input field__date field__number" />
+          </div>
+        </div>
+      <p class="resumen__total">Total: <strong>{{ totalParticipantes }}</strong> personas</p>
+      <ng-template pTemplate="footer">
+        <div class="dialog-footer">
+          <button class="btn-save" type="button" (click)="personasDialogVisible = false"><i class="ti ti-check"></i> Listo</button>
+        </div>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Sub-formulario: desglose de costos -->
+    <p-dialog
+      [(visible)]="costosDialogVisible"
+      [modal]="true"
+      [draggable]="false"
+      [resizable]="false"
+      [style]="{ width: '640px' }"
+      header="Desglose de costos"
+      appendTo="body"
+    >
+      <div class="costos">
+      <div class="costos__form">
+          <input
+            type="text"
+            class="costos__input costos__input--concepto"
+            [ngModelOptions]="{ standalone: true }"
+            [(ngModel)]="nuevoCostoForm.concepto"
+            maxlength="200"
+            placeholder="Concepto (ej: Traslado, Alimentación)"
+            (keydown.enter)="$event.preventDefault(); agregarCostoNuevo()"
+          />
+          <p-select
+            class="costos__tipo"
+            [options]="tiposCosto"
+            optionLabel="label"
+            optionValue="value"
+            [ngModelOptions]="{ standalone: true }"
+            [(ngModel)]="nuevoCostoForm.tipo"
+            appendTo="body"
+          />
+          <input
+            type="number"
+            class="costos__input costos__input--monto"
+            [ngModelOptions]="{ standalone: true }"
+            [(ngModel)]="nuevoCostoForm.monto"
+            min="1"
+            step="1"
+            placeholder="Monto ($)"
+            (keydown.enter)="$event.preventDefault(); agregarCostoNuevo()"
+          />
+          <button class="btn-save costos__btn" type="button" (click)="agregarCostoNuevo()" [disabled]="!nuevoCostoValido">
+            <i class="ti ti-plus"></i> Agregar
+          </button>
+        </div>
+
+        <table class="costos__tabla" *ngIf="nuevosCostos.length > 0">
+          <tbody>
+            <tr *ngFor="let c of nuevosCostos; let i = index">
+              <td>{{ c.concepto }}</td>
+              <td class="costos__num" [class.costos__monto--ingreso]="c.tipo === 'INGRESO'" [class.costos__monto--gasto]="c.tipo === 'GASTO'">{{ fmtCosto(c) }}</td>
+              <td class="costos__acciones">
+                <button class="btn-icon btn-icon--delete" type="button" title="Quitar" (click)="quitarCostoNuevo(i)"><i class="ti ti-trash"></i></button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="costos__final">
+              <td>Resultado final</td>
+              <td class="costos__num" [class.costos__monto--ingreso]="totalesNuevosCostos.saldo > 0" [class.costos__monto--gasto]="totalesNuevosCostos.saldo < 0">{{ fmtSaldo(totalesNuevosCostos.saldo) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <small class="field__hint">Gasto resta y ingreso suma. Después podrás agregar o corregir costos desde "Ver" en el proyecto.</small>
+      <ng-template pTemplate="footer">
+        <div class="dialog-footer">
+          <button class="btn-save" type="button" (click)="costosDialogVisible = false"><i class="ti ti-check"></i> Listo</button>
+        </div>
+      </ng-template>
+    </p-dialog>
   </form>
 
   <ng-template pTemplate="footer">
@@ -359,6 +548,83 @@
           <small class="field__hint">JPG, PNG, PDF, Word o Excel · máximo 10 MB por archivo</small>
         </div>
       </div>
+    </div>
+
+    <!-- Costos -->
+    <div class="costos">
+      <h3 class="obs__title">
+        <i class="ti ti-coin"></i>
+        Costos del proyecto
+      </h3>
+
+      <div class="costos__form" *ngIf="canEditCostos(detailItem)">
+        <input
+          type="text"
+          class="costos__input costos__input--concepto"
+          [(ngModel)]="costoForm.concepto"
+          maxlength="200"
+          placeholder="Concepto (ej: Traslado, Alimentación, Aporte facultad)"
+          (keyup.enter)="guardarCosto()"
+        />
+        <p-select
+          class="costos__tipo"
+          [options]="tiposCosto"
+          optionLabel="label"
+          optionValue="value"
+          [(ngModel)]="costoForm.tipo"
+          appendTo="body"
+        />
+        <input
+          type="number"
+          class="costos__input costos__input--monto"
+          [(ngModel)]="costoForm.monto"
+          min="1"
+          step="1"
+          placeholder="Monto ($)"
+          (keyup.enter)="guardarCosto()"
+        />
+        <button class="btn-save costos__btn" type="button" (click)="guardarCosto()" [disabled]="guardandoCosto || !costoValido">
+          <i class="ti" [ngClass]="editandoCostoId ? 'ti-check' : 'ti-plus'"></i>
+          {{ editandoCostoId ? 'Guardar' : 'Agregar' }}
+        </button>
+        <button *ngIf="editandoCostoId" class="btn-cancel costos__btn" type="button" (click)="cancelarEdicionCosto()">Cancelar</button>
+      </div>
+
+      <table class="costos__tabla" *ngIf="costos.length > 0; else sinCostos">
+        <thead>
+          <tr><th>Concepto</th><th class="costos__num">Monto</th><th *ngIf="canEditCostos(detailItem)"></th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of costos">
+            <td>{{ c.concepto }}</td>
+            <td class="costos__num" [class.costos__monto--ingreso]="c.tipo === 'INGRESO'" [class.costos__monto--gasto]="c.tipo === 'GASTO'">{{ fmtCosto(c) }}</td>
+            <td class="costos__acciones" *ngIf="canEditCostos(detailItem)">
+              <button class="btn-icon" type="button" title="Editar" (click)="editarCosto(c)"><i class="ti ti-pencil"></i></button>
+              <button class="btn-icon btn-icon--delete" type="button" title="Eliminar" (click)="confirmRemoveCosto(c)"><i class="ti ti-trash"></i></button>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total ingresos</td>
+            <td class="costos__num costos__monto--ingreso">+{{ fmtPesos(totalesCosto.ingresos) }}</td>
+            <td *ngIf="canEditCostos(detailItem)"></td>
+          </tr>
+          <tr>
+            <td>Total gastos</td>
+            <td class="costos__num costos__monto--gasto">−{{ fmtPesos(totalesCosto.gastos) }}</td>
+            <td *ngIf="canEditCostos(detailItem)"></td>
+          </tr>
+          <tr class="costos__final">
+            <td>Resultado final</td>
+            <td class="costos__num" [class.costos__monto--ingreso]="totalesCosto.saldo > 0" [class.costos__monto--gasto]="totalesCosto.saldo < 0">{{ fmtSaldo(totalesCosto.saldo) }}</td>
+            <td *ngIf="canEditCostos(detailItem)"></td>
+          </tr>
+        </tfoot>
+      </table>
+      <ng-template #sinCostos>
+        <p class="obs__empty">Sin costos registrados.</p>
+      </ng-template>
     </div>
 
     <!-- Observaciones -->

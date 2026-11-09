@@ -28,7 +28,13 @@ import {
 import { PlanteamientosService } from '../../core/services/planteamientos.service';
 import { AlumnosVoluntariosService } from '../../core/services/alumnos-voluntarios.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Proyecto, Observacion, EstadoProyecto } from '../../core/models/proyecto.model';
+import { FacultadesService } from '../../core/services/facultades.service';
+import { CarrerasService } from '../../core/services/carreras.service';
+import { ProgramasService } from '../../core/services/programas.service';
+import { UsuariosService } from '../../core/services/usuarios.service';
+import { TIPOS_INTERVENCION } from '../../core/constants/tipos-intervencion';
+import { ALCANCE_OPCIONES } from '../../core/models/solicitud.model';
+import { Proyecto, Observacion, EstadoProyecto, CostoProyecto, TipoCosto, TotalesCosto } from '../../core/models/proyecto.model';
 
 interface PlanteamientoOption {
   id: number;
@@ -80,6 +86,21 @@ export class ProyectosComponent implements OnInit {
 
   selectedEstado: EstadoProyecto | null = null;
 
+  // Filtros adicionales
+  filtroFacultadId: number | null = null;
+  filtroCarreraId: number | null = null;
+  filtroDocenteId: number | null = null;
+  filtroProgramaId: number | null = null;
+  filtroTipo: string | null = null;
+  filtroAlcance: string | null = null;
+
+  facultadFiltroOptions: { label: string; value: number }[] = [];
+  private carrerasFiltroTodas: { label: string; value: number; facultadId: number | null }[] = [];
+  docenteFiltroOptions: { label: string; value: number }[] = [];
+  programaFiltroOptions: { label: string; value: number }[] = [];
+  readonly tipoFiltroOptions = TIPOS_INTERVENCION;
+  readonly alcanceFiltroOptions = ALCANCE_OPCIONES;
+
   readonly estadoOptions: { label: string; value: EstadoProyecto }[] = [
     { label: 'En proceso', value: 'EN_PROCESO' },
     { label: 'Pausado', value: 'PAUSADO' },
@@ -105,6 +126,50 @@ export class ProyectosComponent implements OnInit {
   nuevaObservacion = '';
   addingObservacion = false;
 
+  // Costos del proyecto (ingresos y gastos)
+  costos: CostoProyecto[] = [];
+  readonly tiposCosto: { label: string; value: TipoCosto }[] = [
+    { label: 'Gasto (−)', value: 'GASTO' },
+    { label: 'Ingreso (+)', value: 'INGRESO' },
+  ];
+  costoForm: { concepto: string; tipo: TipoCosto; monto: number | null } = { concepto: '', tipo: 'GASTO', monto: null };
+  editandoCostoId: number | null = null;
+  guardandoCosto = false;
+
+  // Sub-formularios del formulario de proyecto
+  personasDialogVisible = false;
+  faltaPersonas = false;
+  faltaCostos = false;
+  costosDialogVisible = false;
+
+  // Costos que se agregan al crear el proyecto (se envían junto con el proyecto)
+  nuevosCostos: { concepto: string; tipo: TipoCosto; monto: number }[] = [];
+  nuevoCostoForm: { concepto: string; tipo: TipoCosto; monto: number | null } = { concepto: '', tipo: 'GASTO', monto: null };
+
+  get nuevoCostoValido(): boolean {
+    const f = this.nuevoCostoForm;
+    return !!f.concepto.trim() && !!f.monto && f.monto > 0;
+  }
+
+  get totalesNuevosCostos(): TotalesCosto {
+    const ingresos = this.nuevosCostos.filter((c) => c.tipo === 'INGRESO').reduce((a, c) => a + c.monto, 0);
+    const gastos = this.nuevosCostos.filter((c) => c.tipo === 'GASTO').reduce((a, c) => a + c.monto, 0);
+    return { ingresos, gastos, saldo: ingresos - gastos };
+  }
+
+  agregarCostoNuevo(): void {
+    if (!this.nuevoCostoValido) return;
+    this.nuevosCostos = [
+      ...this.nuevosCostos,
+      { concepto: this.nuevoCostoForm.concepto.trim(), tipo: this.nuevoCostoForm.tipo, monto: Math.round(Number(this.nuevoCostoForm.monto)) },
+    ];
+    this.nuevoCostoForm = { concepto: '', tipo: this.nuevoCostoForm.tipo, monto: null };
+  }
+
+  quitarCostoNuevo(i: number): void {
+    this.nuevosCostos = this.nuevosCostos.filter((_, idx) => idx !== i);
+  }
+
   // Modal estado
   estadoDialogVisible = false;
   estadoItem: Proyecto | null = null;
@@ -118,6 +183,10 @@ export class ProyectosComponent implements OnInit {
     private planteamientosService: PlanteamientosService,
     private alumnosService: AlumnosVoluntariosService,
     private authService: AuthService,
+    private facultadesService: FacultadesService,
+    private carrerasService: CarrerasService,
+    private programasService: ProgramasService,
+    private usuariosService: UsuariosService,
     private messageService: MessageService,
     private confirmationService: ConfirmationService,
     private router: Router,
@@ -189,6 +258,42 @@ export class ProyectosComponent implements OnInit {
     const rol = this.currentUser?.rol ?? '';
     if (rol === 'ADMIN') return true;
     return rol === 'DOCENTE' && o.autorId === this.currentUser?.id;
+  }
+
+  /** Gestión edita los costos de cualquier proyecto; el docente solo los de sus proyectos. */
+  canEditCostos(p: Proyecto | null): boolean {
+    if (!p) return false;
+    const rol = this.currentUser?.rol ?? '';
+    if (rol === 'DOCENTE') return this.getDocenteId(p) === this.currentUser?.id;
+    return ['ADMIN', 'GESTOR_VCM', 'DIRECTOR_VCM'].includes(rol);
+  }
+
+  get totalesCosto(): TotalesCosto {
+    const ingresos = this.costos.filter((c) => c.tipo === 'INGRESO').reduce((a, c) => a + c.monto, 0);
+    const gastos = this.costos.filter((c) => c.tipo === 'GASTO').reduce((a, c) => a + c.monto, 0);
+    return { ingresos, gastos, saldo: ingresos - gastos };
+  }
+
+  /** $1.234.567 (pesos chilenos, sin decimales). */
+  fmtPesos(n: number): string {
+    return '$' + Math.abs(Math.round(n)).toLocaleString('es-CL');
+  }
+
+  /** +$200.000 / −$700.000 según el tipo. */
+  fmtCosto(c: { tipo: TipoCosto; monto: number }): string {
+    return (c.tipo === 'INGRESO' ? '+' : '−') + this.fmtPesos(c.monto);
+  }
+
+  /** Resultado (ingresos − gastos) del proyecto para la lista; null si no tiene costos cargados. */
+  saldoProyecto(p: Proyecto): { saldo: number } | null {
+    const costos = p.costos ?? [];
+    if (!costos.length) return null;
+    const saldo = costos.reduce((a, c) => a + (c.tipo === 'INGRESO' ? c.monto : -c.monto), 0);
+    return { saldo };
+  }
+
+  fmtSaldo(n: number): string {
+    return (n > 0 ? '+' : n < 0 ? '−' : '') + this.fmtPesos(n);
   }
 
   // Permitir agregar observaciones a los 6 roles del endpoint (no CLIENTE).
@@ -296,7 +401,70 @@ export class ProyectosComponent implements OnInit {
       return;
     }
     this.loadPlanteamientosDropdown();
+    this.loadFiltrosOpciones();
     this.loadItems();
+  }
+
+  // ── Filtros adicionales ─────────────────────────────────────
+  get carreraFiltroOptions() {
+    return this.carrerasFiltroTodas.filter(
+      (c) => this.filtroFacultadId === null || c.facultadId === this.filtroFacultadId,
+    );
+  }
+
+  /** Solo ADMIN, GESTOR, DECANO y DIRECTOR pueden listar usuarios. */
+  get puedeFiltrarDocente() {
+    return ['ADMIN', 'GESTOR_VCM', 'DECANO', 'DIRECTOR_VCM'].includes(this.currentUser?.rol ?? '');
+  }
+
+  private loadFiltrosOpciones(): void {
+    if (this.useAllEndpoint) {
+      this.facultadesService.getFacultades({ limit: 100 }).subscribe({
+        next: (res) => {
+          this.facultadFiltroOptions = res.items.map((f: any) => ({ label: f.nombre || f.etiqueta, value: f.id }));
+          this.cdr.detectChanges();
+        },
+        error: () => {},
+      });
+      this.carrerasService.getCarreras({ limit: 100 }).subscribe({
+        next: (res) => {
+          this.carrerasFiltroTodas = res.items.map((c: any) => ({
+            label: c.nombre || c.etiqueta,
+            value: c.id,
+            facultadId: c.facultadId ?? c.facultad?.id ?? null,
+          }));
+          this.cdr.detectChanges();
+        },
+        error: () => {},
+      });
+    }
+    if (this.puedeFiltrarDocente) {
+      this.usuariosService.getUsuarios({ rol: 'DOCENTE' as any, limit: 100 }).subscribe({
+        next: (res) => {
+          this.docenteFiltroOptions = res.items.map((u: any) => ({
+            label: `${u.nombres ?? ''} ${u.apellidos ?? ''}`.trim() || u.email,
+            value: u.id,
+          }));
+          this.cdr.detectChanges();
+        },
+        error: () => {},
+      });
+    }
+    this.programasService.getProgramas().subscribe({
+      next: (res) => {
+        this.programaFiltroOptions = res.map((p) => ({ label: p.nombre, value: p.id }));
+        this.cdr.detectChanges();
+      },
+      error: () => {},
+    });
+  }
+
+  onFacultadFiltroChange(): void {
+    // La carrera elegida deja de ser válida si no pertenece a la facultad
+    if (this.filtroCarreraId !== null && !this.carreraFiltroOptions.some((c) => c.value === this.filtroCarreraId)) {
+      this.filtroCarreraId = null;
+    }
+    this.onFilterChange();
   }
 
   // ── Carga de datos ──────────────────────────────────────────
@@ -328,6 +496,12 @@ export class ProyectosComponent implements OnInit {
     this.loading = true;
     const params: Record<string, any> = { page: this.currentPage, limit: this.rows };
     if (this.selectedEstado !== null) params['estado'] = this.selectedEstado;
+    if (this.filtroFacultadId !== null) params['facultadId'] = this.filtroFacultadId;
+    if (this.filtroCarreraId !== null) params['carreraId'] = this.filtroCarreraId;
+    if (this.filtroDocenteId !== null) params['docenteId'] = this.filtroDocenteId;
+    if (this.filtroProgramaId !== null) params['programaId'] = this.filtroProgramaId;
+    if (this.filtroTipo !== null) params['tipoIntervencion'] = this.filtroTipo;
+    if (this.filtroAlcance !== null) params['alcance'] = this.filtroAlcance;
 
     const obs = this.useAllEndpoint
       ? this.service.getAll(params)
@@ -360,6 +534,12 @@ export class ProyectosComponent implements OnInit {
 
   clearFilters(): void {
     this.selectedEstado = null;
+    this.filtroFacultadId = null;
+    this.filtroCarreraId = null;
+    this.filtroDocenteId = null;
+    this.filtroProgramaId = null;
+    this.filtroTipo = null;
+    this.filtroAlcance = null;
     this.currentPage = 1;
     this.loadItems();
   }
@@ -414,6 +594,10 @@ export class ProyectosComponent implements OnInit {
     this.form.reset({ planteamientoId: null, fechaInicio: '', fechaFin: '', alumnoIds: [], participantesDocentes: null, participantesEstudiantes: null, participantesDocentesExternos: null, participantesAlumnosExternos: null, participantesOtrosExternos: null });
     this.form.get('planteamientoId')?.enable();
     this.form.get('alumnoIds')?.disable();
+    this.nuevosCostos = [];
+    this.nuevoCostoForm = { concepto: '', tipo: 'GASTO', monto: null };
+    this.faltaPersonas = false;
+    this.faltaCostos = false;
     this.alumnoOptions = [];
     this.dialogVisible = true;
   }
@@ -461,6 +645,23 @@ export class ProyectosComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
+    // Al crear, las personas alcanzadas y el costo del proyecto son obligatorios
+    if (!this.editingItem) {
+      if (this.totalParticipantes <= 0) {
+        this.faltaPersonas = true;
+        this.showError('Indica las personas alcanzadas por la intervención (botón Desglosar).');
+        this.personasDialogVisible = true;
+        return;
+      }
+      if (this.nuevosCostos.length === 0) {
+        this.faltaCostos = true;
+        this.showError('Registra al menos una línea de costo del proyecto (botón Desglosar).');
+        this.costosDialogVisible = true;
+        return;
+      }
+    }
+    this.faltaPersonas = false;
+    this.faltaCostos = false;
     this.saving = true;
     const raw = this.form.getRawValue();
 
@@ -491,6 +692,7 @@ export class ProyectosComponent implements OnInit {
         participantesDocentesExternos: this.numOrNull(raw.participantesDocentesExternos) ?? undefined,
         participantesAlumnosExternos: this.numOrNull(raw.participantesAlumnosExternos) ?? undefined,
         participantesOtrosExternos: this.numOrNull(raw.participantesOtrosExternos) ?? undefined,
+        costos: this.nuevosCostos,
       };
       this.service.create(dto).subscribe({
         next: () => this.onSaveSuccess('Proyecto creado'),
@@ -547,6 +749,8 @@ export class ProyectosComponent implements OnInit {
   openDetail(item: Proyecto): void {
     this.detailItem = item;
     this.observaciones = item.observaciones ?? [];
+    this.costos = item.costos ?? [];
+    this.cancelarEdicionCosto();
     this.nuevaObservacion = '';
     this.detailVisible = true;
     // Refrescar con el detalle completo y la lista canónica de observaciones.
@@ -554,9 +758,69 @@ export class ProyectosComponent implements OnInit {
       next: (full) => {
         this.detailItem = full;
         this.observaciones = full.observaciones ?? [];
+        this.costos = full.costos ?? [];
         this.cdr.detectChanges();
       },
       error: () => {},
+    });
+  }
+
+  // ── Costos ──────────────────────────────────────────────────
+  editarCosto(c: CostoProyecto): void {
+    this.editandoCostoId = c.id;
+    this.costoForm = { concepto: c.concepto, tipo: c.tipo, monto: c.monto };
+  }
+
+  cancelarEdicionCosto(): void {
+    this.editandoCostoId = null;
+    this.costoForm = { concepto: '', tipo: 'GASTO', monto: null };
+  }
+
+  get costoValido(): boolean {
+    const f = this.costoForm;
+    return !!f.concepto.trim() && !!f.monto && f.monto > 0;
+  }
+
+  guardarCosto(): void {
+    if (!this.detailItem || !this.costoValido) return;
+    const dto = { concepto: this.costoForm.concepto.trim(), tipo: this.costoForm.tipo, monto: Math.round(Number(this.costoForm.monto)) };
+    const peticion = this.editandoCostoId
+      ? this.service.updateCosto(this.detailItem.id, this.editandoCostoId, dto)
+      : this.service.addCosto(this.detailItem.id, dto);
+    this.guardandoCosto = true;
+    peticion.subscribe({
+      next: (r) => {
+        this.costos = r.costos;
+        this.cancelarEdicionCosto();
+        this.guardandoCosto = false;
+        this.messageService.add({ severity: 'success', summary: 'Costos', detail: 'Costo guardado', life: 3000 });
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.guardandoCosto = false;
+        this.cdr.detectChanges();
+        this.showError(err?.error?.message || 'No se pudo guardar el costo');
+      },
+    });
+  }
+
+  confirmRemoveCosto(c: CostoProyecto): void {
+    this.confirmationService.confirm({
+      message: `¿Eliminar "${c.concepto}" (${this.fmtCosto(c)})?`,
+      header: 'Confirmar',
+      acceptLabel: 'Eliminar',
+      rejectLabel: 'Cancelar',
+      accept: () => {
+        if (!this.detailItem) return;
+        this.service.removeCosto(this.detailItem.id, c.id).subscribe({
+          next: (r) => {
+            this.costos = r.costos;
+            if (this.editandoCostoId === c.id) this.cancelarEdicionCosto();
+            this.cdr.detectChanges();
+          },
+          error: (err: any) => this.showError(err?.error?.message || 'No se pudo eliminar el costo'),
+        });
+      },
     });
   }
 

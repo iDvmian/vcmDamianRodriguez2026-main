@@ -31,6 +31,8 @@ import {
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/strategies/jwt.strategy';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateCostoDto } from './dto/create-costo.dto';
+import { UpdateCostoDto } from './dto/update-costo.dto';
 import { CreateObservacionDto } from './dto/create-observacion.dto';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { QueryProyectosDto } from './dto/query-proyectos.dto';
@@ -218,6 +220,47 @@ export class ProyectosController {
     @Request() req: { user: CurrentUser },
   ) {
     return this.proyectosService.removeArchivo(id, archivoId, req.user);
+  }
+
+  @Post(':id/costos')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.GESTOR_VCM, Role.DIRECTOR_VCM)
+  @ApiOperation({ summary: 'Agregar una línea de costo (ingreso o gasto) al proyecto' })
+  @ApiCreatedResponse({ description: 'Costo registrado; devuelve la lista y los totales' })
+  @ApiNotFoundResponse({ description: 'Proyecto no encontrado' })
+  @ApiForbiddenResponse({ description: 'Sin permiso para editar los costos de este proyecto' })
+  addCosto(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateCostoDto,
+    @Request() req: { user: CurrentUser },
+  ) {
+    return this.proyectosService.addCosto(id, dto, req.user);
+  }
+
+  @Patch(':id/costos/:costoId')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.GESTOR_VCM, Role.DIRECTOR_VCM)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Editar una línea de costo del proyecto' })
+  @ApiOkResponse({ description: 'Costo actualizado; devuelve la lista y los totales' })
+  updateCosto(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('costoId', ParseIntPipe) costoId: number,
+    @Body() dto: UpdateCostoDto,
+    @Request() req: { user: CurrentUser },
+  ) {
+    return this.proyectosService.updateCosto(id, costoId, dto, req.user);
+  }
+
+  @Delete(':id/costos/:costoId')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.GESTOR_VCM, Role.DIRECTOR_VCM)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Eliminar una línea de costo del proyecto' })
+  @ApiOkResponse({ description: 'Costo eliminado; devuelve la lista y los totales' })
+  removeCosto(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('costoId', ParseIntPipe) costoId: number,
+    @Request() req: { user: CurrentUser },
+  ) {
+    return this.proyectosService.removeCosto(id, costoId, req.user);
   }
 
   @Post(':proyectoId/observaciones')

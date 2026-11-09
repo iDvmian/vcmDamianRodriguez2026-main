@@ -18,6 +18,8 @@ import { CurrentUser } from '../auth/strategies/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { MailService } from '../mail/mail.service';
+import { CreateCostoDto } from './dto/create-costo.dto';
+import { UpdateCostoDto } from './dto/update-costo.dto';
 import { CreateObservacionDto } from './dto/create-observacion.dto';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { QueryProyectosDto } from './dto/query-proyectos.dto';
@@ -42,6 +44,7 @@ const PROYECTO_INCLUDE = {
     },
   },
   archivos: { orderBy: { createdAt: 'asc' as const } },
+  costos: { orderBy: { id: 'asc' as const } },
   observaciones: {
     include: { autor: { select: { id: true, nombres: true, apellidos: true, email: true } } },
     orderBy: { createdAt: 'desc' as const },
@@ -85,6 +88,7 @@ export class ProyectosService {
     }
 
     if (estado !== undefined) where.estado = estado;
+    this.aplicarFiltros(where, query);
 
     const [items, total] = await Promise.all([
       this.prisma.proyecto.findMany({
@@ -92,12 +96,29 @@ export class ProyectosService {
         include: PROYECTO_INCLUDE,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { id: 'desc' },
       }),
       this.prisma.proyecto.count({ where }),
     ]);
 
     return { data: { items, total, page, limit }, message: 'Proyectos obtenidos exitosamente', statusCode: 200 };
+  }
+
+  /** Filtros opcionales del listado (se combinan con AND con las restricciones por rol). */
+  private aplicarFiltros(where: Record<string, unknown>, query: QueryProyectosDto): void {
+    const { facultadId, carreraId, docenteId, programaId, tipoIntervencion, alcance } = query;
+    const condiciones: Record<string, unknown>[] = [];
+    if (facultadId !== undefined) {
+      condiciones.push({ planteamiento: { solicitud: { carrera: { is: { facultadId } } } } });
+    }
+    if (carreraId !== undefined) condiciones.push({ planteamiento: { solicitud: { carreraId } } });
+    if (docenteId !== undefined) condiciones.push({ planteamiento: { docenteId } });
+    if (programaId !== undefined) condiciones.push({ planteamiento: { solicitud: { programaId } } });
+    if (tipoIntervencion !== undefined) condiciones.push({ planteamiento: { tipoIntervencion } });
+    if (alcance !== undefined) condiciones.push({ planteamiento: { solicitud: { alcance } } });
+    if (!condiciones.length) return;
+    const previo = where.AND;
+    where.AND = [...(Array.isArray(previo) ? previo : previo ? [previo] : []), ...condiciones];
   }
 
   async findMisProyectos(currentUser: CurrentUser, query: QueryProyectosDto) {
@@ -106,6 +127,7 @@ export class ProyectosService {
 
     const where: Record<string, unknown> = { planteamiento: { docenteId: currentUser.id } };
     if (estado !== undefined) where.estado = estado;
+    this.aplicarFiltros(where, query);
 
     const [items, total] = await Promise.all([
       this.prisma.proyecto.findMany({
@@ -113,7 +135,7 @@ export class ProyectosService {
         include: PROYECTO_INCLUDE,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { id: 'desc' },
       }),
       this.prisma.proyecto.count({ where }),
     ]);
@@ -162,6 +184,16 @@ export class ProyectosService {
       throw new BadRequestException('Este planteamiento ya tiene un proyecto asociado');
     }
 
+    const totalPersonas =
+      (dto.participantesDocentes ?? 0) +
+      (dto.participantesEstudiantes ?? 0) +
+      (dto.participantesDocentesExternos ?? 0) +
+      (dto.participantesAlumnosExternos ?? 0) +
+      (dto.participantesOtrosExternos ?? 0);
+    if (totalPersonas <= 0) {
+      throw new BadRequestException('Debes indicar las personas alcanzadas por la intervención');
+    }
+
     if (dto.alumnoIds && dto.alumnoIds.length > 0) {
       const alumnos = await this.prisma.alumnoVoluntario.findMany({
         where: { id: { in: dto.alumnoIds } },
@@ -190,6 +222,18 @@ export class ProyectosService {
       if (dto.alumnoIds && dto.alumnoIds.length > 0) {
         await tx.proyectoAlumno.createMany({
           data: dto.alumnoIds.map((alumnoId) => ({ proyectoId: created.id, alumnoId })),
+        });
+      }
+
+      {
+        await tx.costoProyecto.createMany({
+          data: dto.costos.map((c) => ({
+            proyectoId: created.id,
+            concepto: c.concepto.trim(),
+            tipo: c.tipo,
+            monto: c.monto,
+            ...(c.fecha ? { fecha: new Date(c.fecha) } : {}),
+          })),
         });
       }
 
@@ -396,6 +440,68 @@ export class ProyectosService {
     await this.prisma.archivoProyecto.delete({ where: { id: archivoId } });
 
     return { data: null, message: 'Archivo eliminado', statusCode: 200 };
+  }
+
+  // ── Costos del proyecto (ingresos y gastos) ─────────────────────────────
+  /** Gestión (Admin, Gestor, Director) edita cualquier proyecto; el docente solo los suyos. */
+  private async proyectoEditableParaCostos(proyectoId: number, currentUser: CurrentUser) {
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { id: proyectoId },
+      include: { planteamiento: { select: { docenteId: true } } },
+    });
+    if (!proyecto) throw new NotFoundException(`Proyecto con id ${proyectoId} no encontrado`);
+    if (currentUser.rol === Role.DOCENTE && proyecto.planteamiento.docenteId !== currentUser.id) {
+      throw new ForbiddenException('No tienes permiso para editar los costos de este proyecto');
+    }
+    return proyecto;
+  }
+
+  private async costosDelProyecto(proyectoId: number) {
+    const costos = await this.prisma.costoProyecto.findMany({
+      where: { proyectoId },
+      orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
+    });
+    const ingresos = costos.filter((c) => c.tipo === 'INGRESO').reduce((a, c) => a + c.monto, 0);
+    const gastos = costos.filter((c) => c.tipo === 'GASTO').reduce((a, c) => a + c.monto, 0);
+    return { costos, totales: { ingresos, gastos, saldo: ingresos - gastos } };
+  }
+
+  async addCosto(proyectoId: number, dto: CreateCostoDto, currentUser: CurrentUser) {
+    await this.proyectoEditableParaCostos(proyectoId, currentUser);
+    await this.prisma.costoProyecto.create({
+      data: {
+        proyectoId,
+        concepto: dto.concepto.trim(),
+        tipo: dto.tipo,
+        monto: dto.monto,
+        ...(dto.fecha ? { fecha: new Date(dto.fecha) } : {}),
+      },
+    });
+    return { data: await this.costosDelProyecto(proyectoId), message: 'Costo registrado', statusCode: 201 };
+  }
+
+  async updateCosto(proyectoId: number, costoId: number, dto: UpdateCostoDto, currentUser: CurrentUser) {
+    await this.proyectoEditableParaCostos(proyectoId, currentUser);
+    const costo = await this.prisma.costoProyecto.findFirst({ where: { id: costoId, proyectoId } });
+    if (!costo) throw new NotFoundException(`Costo con id ${costoId} no encontrado en este proyecto`);
+    await this.prisma.costoProyecto.update({
+      where: { id: costoId },
+      data: {
+        ...(dto.concepto !== undefined ? { concepto: dto.concepto.trim() } : {}),
+        ...(dto.tipo !== undefined ? { tipo: dto.tipo } : {}),
+        ...(dto.monto !== undefined ? { monto: dto.monto } : {}),
+        ...(dto.fecha ? { fecha: new Date(dto.fecha) } : {}),
+      },
+    });
+    return { data: await this.costosDelProyecto(proyectoId), message: 'Costo actualizado', statusCode: 200 };
+  }
+
+  async removeCosto(proyectoId: number, costoId: number, currentUser: CurrentUser) {
+    await this.proyectoEditableParaCostos(proyectoId, currentUser);
+    const costo = await this.prisma.costoProyecto.findFirst({ where: { id: costoId, proyectoId } });
+    if (!costo) throw new NotFoundException(`Costo con id ${costoId} no encontrado en este proyecto`);
+    await this.prisma.costoProyecto.delete({ where: { id: costoId } });
+    return { data: await this.costosDelProyecto(proyectoId), message: 'Costo eliminado', statusCode: 200 };
   }
 
   async addObservacion(proyectoId: number, dto: CreateObservacionDto, currentUser: CurrentUser) {

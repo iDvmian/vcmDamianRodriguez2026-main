@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { Proyecto, Observacion, EstadoProyecto } from '../models/proyecto.model';
+import { Proyecto, Observacion, EstadoProyecto, CostosProyecto, TipoCosto } from '../models/proyecto.model';
 import { PaginatedResponse } from '../models/paginated-response.model';
 
 export interface CreateProyectoDto {
@@ -16,6 +16,7 @@ export interface CreateProyectoDto {
   participantesDocentesExternos?: number;
   participantesAlumnosExternos?: number;
   participantesOtrosExternos?: number;
+  costos?: CostoDto[];
 }
 
 export interface UpdateProyectoDto {
@@ -32,6 +33,13 @@ export interface UpdateProyectoDto {
 
 export interface UpdateEstadoProyectoDto {
   estado: EstadoProyecto;
+}
+
+export interface CostoDto {
+  concepto: string;
+  tipo: TipoCosto;
+  monto: number;
+  fecha?: string;
 }
 
 export interface CreateObservacionDto {
@@ -53,7 +61,7 @@ export class ProyectosService {
   constructor(private http: HttpClient) {}
 
   getMisProyectos(
-    params: { estado?: EstadoProyecto | null; page?: number; limit?: number } = {},
+    params: { estado?: EstadoProyecto | null; page?: number; limit?: number; [filtro: string]: any } = {},
   ): Observable<PaginatedResponse<Proyecto>> {
     return this.http
       .get<any>(`${this.apiUrl}/mis-proyectos`, { params: buildParams(params) })
@@ -61,7 +69,7 @@ export class ProyectosService {
   }
 
   getAll(
-    params: { estado?: EstadoProyecto | null; page?: number; limit?: number } = {},
+    params: { estado?: EstadoProyecto | null; page?: number; limit?: number; [filtro: string]: any } = {},
   ): Observable<PaginatedResponse<Proyecto>> {
     return this.http
       .get<any>(this.apiUrl, { params: buildParams(params) })
@@ -114,6 +122,18 @@ export class ProyectosService {
     return this.http
       .delete<any>(`${this.apiUrl}/${proyectoId}/observaciones/${obsId}`)
       .pipe(map(() => void 0));
+  }
+
+  addCosto(proyectoId: number, dto: CostoDto): Observable<CostosProyecto> {
+    return this.http.post<any>(`${this.apiUrl}/${proyectoId}/costos`, dto).pipe(map(r => r.data));
+  }
+
+  updateCosto(proyectoId: number, costoId: number, dto: Partial<CostoDto>): Observable<CostosProyecto> {
+    return this.http.patch<any>(`${this.apiUrl}/${proyectoId}/costos/${costoId}`, dto).pipe(map(r => r.data));
+  }
+
+  removeCosto(proyectoId: number, costoId: number): Observable<CostosProyecto> {
+    return this.http.delete<any>(`${this.apiUrl}/${proyectoId}/costos/${costoId}`).pipe(map(r => r.data));
   }
 
   addArchivo(proyectoId: number, file: File): Observable<void> {

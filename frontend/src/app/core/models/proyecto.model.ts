@@ -35,6 +35,30 @@ export interface ArchivoProyecto {
   createdAt: string;
 }
 
+export type TipoCosto = 'INGRESO' | 'GASTO';
+
+export interface CostoProyecto {
+  id: number;
+  concepto: string;
+  tipo: TipoCosto;
+  /** Siempre positivo; el signo lo da el tipo (ingreso +, gasto -). */
+  monto: number;
+  fecha: string;
+  proyectoId: number;
+}
+
+export interface TotalesCosto {
+  ingresos: number;
+  gastos: number;
+  /** ingresos - gastos */
+  saldo: number;
+}
+
+export interface CostosProyecto {
+  costos: CostoProyecto[];
+  totales: TotalesCosto;
+}
+
 export interface Proyecto {
   id: number;
   estado: EstadoProyecto;
@@ -52,6 +76,7 @@ export interface Proyecto {
   alumnos?: ProyectoAlumno[];
   observaciones?: Observacion[];
   archivos?: ArchivoProyecto[];
+  costos?: CostoProyecto[];
   createdAt: string;
   updatedAt: string;
 }

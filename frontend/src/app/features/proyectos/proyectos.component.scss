@@ -122,12 +122,15 @@
   justify-content: center;
 }
 
-.col-actions  { width: 150px; text-align: center; }
-.col-proyecto { min-width: 180px; max-width: 280px; }
+.col-actions  { width: 130px; text-align: center; }
+.col-proyecto { min-width: 200px; }
 .col-estado   { width: 110px; }
-.col-fecha    { width: 110px; }
-.col-alumnos  { width: 100px; text-align: center; }
-.col-docente  { min-width: 140px; max-width: 200px; }
+.col-fecha    { width: 100px; }
+.col-alumnos  { width: 80px; text-align: center; }
+.col-docente  { min-width: 150px; }
+.col-costo    { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.costo--pos   { color: #15803d; font-weight: 600; }
+.costo--neg   { color: #b91c1c; font-weight: 600; }
 
 .text-muted {
   color: var(--ucm-muted);
@@ -152,6 +155,7 @@
   }
 
   .col-alumnos { text-align: center; }
+  .col-costo { text-align: right; }
 }
 
 .empty-cell {
@@ -550,3 +554,32 @@
     font-size: 0;
   }
 }
+
+/* Costos del proyecto */
+.costos { margin-top: 20px; }
+.costos__form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.costos__input {
+  height: 38px; padding: 0 10px; border: 1px solid var(--ucm-borde, #d9dee7); border-radius: 8px; font: inherit; background: #fff;
+}
+.costos__input--concepto { flex: 1 1 220px; min-width: 160px; }
+.costos__input--monto { width: 130px; }
+.costos__tipo { width: 130px; }
+.costos__btn { height: 38px; }
+.costos__tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.costos__tabla th, .costos__tabla td { padding: 8px 10px; border-bottom: 1px solid var(--ucm-borde, #e5e9f0); text-align: left; }
+.costos__tabla th { font-size: 12px; color: #6b7280; font-weight: 600; }
+.costos__num { text-align: right !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.costos__acciones { width: 80px; text-align: right !important; white-space: nowrap; }
+.costos__monto--ingreso { color: #15803d; font-weight: 600; }
+.costos__monto--gasto { color: #b91c1c; font-weight: 600; }
+.costos__tabla tfoot td { border-bottom: none; color: #374151; }
+.costos__final td { border-top: 2px solid #1b3d8c; font-weight: 700; font-size: 15px; }
+
+/* Resumen de totales en el formulario de proyecto (el desglose se abre en otro diálogo) */
+.resumen { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--ucm-borde, #d9dee7); border-radius: 10px; background: #f8fafc; }
+.resumen__valor { font-size: 20px; font-weight: 700; color: #1b3d8c; }
+.resumen__valor small { font-size: 12px; font-weight: 500; color: #6b7280; margin-left: 6px; }
+.resumen__btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid #1b3d8c; border-radius: 8px; background: #fff; color: #1b3d8c; font: inherit; font-weight: 600; cursor: pointer; }
+.resumen__btn:hover { background: #eef2fb; }
+.resumen__total { margin: 12px 0 0; text-align: right; color: #374151; }
+.resumen--error { border-color: #dc2626; background: #fef2f2; }

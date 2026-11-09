@@ -19,6 +19,11 @@ enum Role {
   CLIENTE
 }
 
+enum TipoCosto {
+  INGRESO
+  GASTO
+}
+
 enum EtapaSeguimiento {
   SOLICITUD_CREADA
   SOLICITUD_APROBADA
@@ -271,8 +276,24 @@ model Proyecto {
   alumnos         ProyectoAlumno[]
   observaciones   Observacion[]
   archivos        ArchivoProyecto[]
+  costos          CostoProyecto[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+/// Desglose de costos de un proyecto: cada fila es un ingreso (+) o un gasto (-). El monto se guarda siempre positivo.
+model CostoProyecto {
+  id         Int       @id @default(autoincrement())
+  concepto   String    @db.VarChar(200)
+  tipo       TipoCosto
+  monto      Int
+  fecha      DateTime  @default(now())
+  proyectoId Int
+  proyecto   Proyecto  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([proyectoId])
 }
 
 model ArchivoProyecto {
