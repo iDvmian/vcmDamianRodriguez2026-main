@@ -22,7 +22,7 @@
       Usuarios
     </a>
     <a *ngIf="showAlumnosVoluntarios" routerLink="/dashboard/alumnos-voluntarios" routerLinkActive="navbar__link--active" class="navbar__link">
-      Alumnos Voluntarios
+      Alumnos voluntarios
     </a>
     <a routerLink="/dashboard/solicitudes" routerLinkActive="navbar__link--active" class="navbar__link">
       Solicitudes
@@ -35,6 +35,9 @@
     </a>
     <a *ngIf="showMisVinculaciones" routerLink="/dashboard/mis-vinculaciones" routerLinkActive="navbar__link--active" class="navbar__link">
       Mis vinculaciones
+    </a>
+    <a *ngIf="showPlanEstrategico" routerLink="/dashboard/plan-estrategico" routerLinkActive="navbar__link--active" class="navbar__link">
+      Plan estratégico
     </a>
     <a *ngIf="showReportes" routerLink="/dashboard/reportes" routerLinkActive="navbar__link--active" class="navbar__link">
       Reportes

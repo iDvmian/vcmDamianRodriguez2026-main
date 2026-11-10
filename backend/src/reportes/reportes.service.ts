@@ -20,7 +20,7 @@ export class ReportesService {
     // El Decano solo ve los proyectos de las carreras de su facultad
     const facultadDecano = await facultadDelDecano(this.prisma, currentUser);
     if (facultadDecano !== null) {
-      where.planteamiento = { solicitud: { carrera: { is: { facultadId: facultadDecano } } } };
+      where.planteamiento = { solicitud: { facultadId: facultadDecano } };
     }
 
     if (
@@ -39,7 +39,7 @@ export class ReportesService {
       where.planteamiento = {
         solicitud: {
           carreraId: query.carreraId,
-          ...(facultadDecano !== null && { carrera: { is: { facultadId: facultadDecano } } }),
+          ...(facultadDecano !== null && { facultadId: facultadDecano }),
         },
       };
     }

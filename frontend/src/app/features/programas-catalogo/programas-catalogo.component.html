@@ -3,7 +3,7 @@
     <div>
       <h1 class="page__title"><i class="ti ti-heart-handshake"></i> Programas de vinculación con el medio</h1>
       <p class="page__sub">
-        La universidad desarrolla estos programas con la comunidad. Al crear una solicitud, elige el que mejor se ajuste a lo que necesitas.
+        La universidad desarrolla estos programas con la comunidad. Elige uno de la lista para conocerlo en detalle.
       </p>
     </div>
     <a *ngIf="puedeAdministrar" routerLink="/dashboard/programas/administrar" class="btn-admin">
@@ -11,29 +11,50 @@
     </a>
   </div>
 
-  <div class="buscador" *ngIf="!loading && programas.length">
-    <i class="ti ti-search"></i>
-    <input type="search" [(ngModel)]="busqueda" placeholder="Buscar por nombre, descripción o actividad" aria-label="Buscar programas" />
-    <span class="buscador__cuenta">{{ filtrados.length }} de {{ programas.length }}</span>
-  </div>
-
   <p class="estado" *ngIf="loading">Cargando programas…</p>
   <p class="estado estado--error" *ngIf="error">No se pudieron cargar los programas. Intenta nuevamente.</p>
   <p class="estado" *ngIf="!loading && !error && !programas.length">Aún no hay programas registrados.</p>
-  <p class="estado" *ngIf="!loading && programas.length && !filtrados.length">Ningún programa coincide con tu búsqueda.</p>
 
-  <div class="grilla">
-    <article class="programa" *ngFor="let p of filtrados">
-      <span class="programa__num">{{ p.orden }}</span>
-      <h2 class="programa__titulo">{{ p.nombre }}</h2>
-      <p class="programa__texto" *ngIf="p.descripcion; else sinInfo">{{ p.descripcion }}</p>
-      <ng-template #sinInfo><p class="programa__texto programa__texto--vacio">Información del programa próximamente.</p></ng-template>
-      <div *ngIf="actividadesDe(p).length" class="programa__actividades">
-        <strong>Actividades clave</strong>
-        <ul>
+  <div class="layout" *ngIf="!loading && programas.length">
+    <!-- Menú fijo con todos los programas -->
+    <nav class="menu" aria-label="Programas de vinculación">
+      <button
+        type="button"
+        class="menu__item"
+        *ngFor="let p of programas"
+        [class.menu__item--activo]="p.id === seleccionadoId"
+        [attr.aria-current]="p.id === seleccionadoId ? 'true' : null"
+        (click)="seleccionadoId = p.id"
+      >
+        <span class="menu__num">{{ p.orden }}</span>
+        <span class="menu__texto">
+          <span class="menu__nombre">{{ p.nombre }}</span>
+          <span class="menu__facultad" *ngIf="p.facultad">{{ p.facultad.etiqueta }}</span>
+        </span>
+      </button>
+    </nav>
+
+    <article class="detalle" *ngIf="seleccionado as p">
+      <header class="detalle__head">
+        <span class="detalle__num">{{ p.orden }}</span>
+        <div>
+          <h2 class="detalle__titulo">{{ p.nombre }}</h2>
+          <span class="programa__facultad" *ngIf="p.facultad"><i class="ti ti-building"></i> {{ p.facultad.nombre }}</span>
+        </div>
+      </header>
+  
+      <section class="detalle__bloque">
+        <h3 class="detalle__sub">Descripción</h3>
+        <p class="detalle__texto" *ngIf="p.descripcion; else sinInfo">{{ p.descripcion }}</p>
+        <ng-template #sinInfo><p class="detalle__texto detalle__texto--vacio">Información del programa próximamente.</p></ng-template>
+      </section>
+  
+      <section class="detalle__bloque" *ngIf="actividadesDe(p).length">
+        <h3 class="detalle__sub">Actividades clave</h3>
+        <ul class="detalle__lista">
           <li *ngFor="let a of actividadesDe(p)">{{ a }}</li>
         </ul>
-      </div>
+      </section>
     </article>
   </div>
 </div>

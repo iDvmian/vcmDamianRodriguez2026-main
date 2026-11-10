@@ -15,10 +15,17 @@ export class CreateSolicitudDto {
   @MaxLength(560)
   descripcion: string;
 
-  @ApiProperty({ example: 1, description: 'Programa de Vinculación con el Medio al que se asocia la solicitud' })
-  @IsInt({ message: 'Selecciona un programa de vinculación' })
-  @IsPositive({ message: 'Selecciona un programa de vinculación' })
-  programaId: number;
+  @ApiPropertyOptional({ example: 1, description: 'Programa de Vinculación con el Medio. Vacío si la solicitud no encaja en ninguno' })
+  @IsOptional()
+  @IsInt({ message: 'Programa inválido' })
+  @IsPositive({ message: 'Programa inválido' })
+  programaId?: number | null;
+
+  @ApiPropertyOptional({ example: 1, description: 'Facultad a la que se dirige. Obligatoria si no hay programa; si hay, debe ser la del programa' })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  facultadId?: number | null;
 
   @ApiProperty({ enum: AlcanceVinculacion, example: AlcanceVinculacion.REGIONAL, description: 'Alcance territorial de la vinculación' })
   @IsEnum(AlcanceVinculacion, { message: 'Alcance inválido' })
@@ -88,5 +95,5 @@ export class CreateSolicitudDto {
   @IsOptional()
   @IsInt()
   @IsPositive()
-  carreraId?: number;
+  carreraId?: number | null;
 }

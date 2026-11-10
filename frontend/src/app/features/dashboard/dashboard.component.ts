@@ -347,6 +347,49 @@ export class DashboardComponent implements OnInit {
     if (img && !img.complete) img.onload = lanzar; else lanzar();
   }
   readonly optsBarra = this.baseOptions(true);
+
+
+  /** Gasto por persona alcanzada; null si no hay datos. */
+  costoPorPersona(d: Dashboard): number | null {
+    const personas = d.resumen.participantes.total;
+    return personas > 0 && d.resumen.costos.proyectosConCostos > 0 ? d.resumen.costos.gastos / personas : null;
+  }
+
+  get costoPorFacultad(): boolean {
+    return this.esGlobal && !this.facultadId;
+  }
+
+  get tituloInversion(): string {
+    return this.costoPorFacultad ? 'Inversión por facultad' : 'Inversión por carrera';
+  }
+
+  /**
+   * Unidades (facultades o carreras) con lo invertido en cada una.
+   * Invertido = gastos registrados en los proyectos.
+   */
+  get unidadesInversion(): {
+    nombre: string; etiqueta: string; facultadId: number | null; gastos: number;
+    proyectos: number; pctTotal: number; ancho: number; color: string;
+  }[] {
+    const ac = this.data?.analisisCostos;
+    if (!ac) return [];
+    const base: { nombre: string; etiqueta: string; facultadId: number | null; gastos: number; proyectos: number }[] =
+      this.costoPorFacultad
+        ? ac.porFacultad.map((f) => ({ nombre: f.facultad, etiqueta: f.etiqueta, facultadId: f.facultadId, gastos: f.gastos, proyectos: f.proyectos }))
+        : ac.porCarrera.map((c) => ({ nombre: c.carrera, etiqueta: c.etiqueta, facultadId: null, gastos: c.gastos, proyectos: c.proyectos }));
+    const total = base.reduce((a, x) => a + x.gastos, 0);
+    const maximo = Math.max(1, ...base.map((x) => x.gastos));
+    return base.map((x, i) => ({
+      ...x,
+      pctTotal: total ? Math.round((x.gastos / total) * 1000) / 10 : 0,
+      ancho: Math.max(4, Math.round((x.gastos / maximo) * 100)),
+      color: this.PALETA_TIPOS[i % this.PALETA_TIPOS.length],
+    }));
+  }
+
+  get totalInvertido(): number {
+    return this.unidadesInversion.reduce((a, x) => a + x.gastos, 0);
+  }
   readonly optsBarraH = { ...this.baseOptions(false), indexAxis: 'y' as const };
 
   /** Opciones del gráfico "Por tipo de intervención": barras horizontales con espacio, leyenda arriba y todos los nombres visibles. */
@@ -956,6 +999,12 @@ export class DashboardComponent implements OnInit {
       },
     },
   ];
+
+  /** $1.234.567 (pesos chilenos); con − si el valor es negativo. */
+  fmtPesos(n: number | null | undefined): string {
+    if (n === null || n === undefined) return '—';
+    return (n < 0 ? '−' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('es-CL');
+  }
 
   fmt(n: number | null | undefined, sufijo = ''): string {
     return n === null || n === undefined ? '—' : `${n.toLocaleString('es-CL')}${sufijo}`;

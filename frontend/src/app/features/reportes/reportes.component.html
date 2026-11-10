@@ -198,6 +198,7 @@
         <span class="chip" *ngFor="let e of vista.resumen.porEstado">{{ e.estado }}: <strong>{{ e.cantidad }}</strong></span>
         <span class="chip chip--azul" *ngIf="vista.resumen.horasTotales !== null">Horas hombre: <strong>{{ vista.resumen.horasTotales }}</strong></span>
         <span class="chip chip--azul" *ngIf="vista.resumen.personasTotales !== null">Personas alcanzadas: <strong>{{ vista.resumen.personasTotales }}</strong></span>
+        <span class="chip chip--azul" *ngIf="vista.resumen.gastoTotal !== null">Gasto total: <strong>${{ vista.resumen.gastoTotal!.toLocaleString('es-CL') }}</strong></span>
       </div>
 
       <p class="estado-msg" *ngIf="vista.total === 0">No hay registros con los filtros elegidos.</p>

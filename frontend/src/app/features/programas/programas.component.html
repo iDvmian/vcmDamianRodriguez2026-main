@@ -26,6 +26,7 @@
         <tr>
           <th class="col-orden">N.º</th>
           <th>Programa</th>
+          <th>Facultad</th>
           <th>Descripción</th>
           <th>Actividades</th>
           <th>Solicitudes</th>
@@ -38,6 +39,7 @@
         <tr [class.fila-inactiva]="!item.activo">
           <td class="col-orden">{{ item.orden }}</td>
           <td class="col-nombre">{{ item.nombre }}</td>
+          <td>{{ item.facultad?.nombre || '—' }}</td>
           <td class="col-desc">
             <span *ngIf="item.descripcion; else sinDesc">{{ item.descripcion }}</span>
             <ng-template #sinDesc><span class="text-muted">Sin descripción</span></ng-template>
@@ -62,7 +64,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7">
+          <td colspan="8">
             <div class="empty-cell">
               <i class="ti ti-inbox"></i>
               Sin programas registrados
@@ -89,6 +91,21 @@
       <small class="field__error" *ngIf="form.get('nombre')?.invalid && form.get('nombre')?.touched">
         El nombre es requerido
       </small>
+    </div>
+
+    <div class="field">
+      <label class="field__label">Facultad <span class="required">*</span></label>
+      <p-select
+        formControlName="facultadId"
+        placeholder="Selecciona la facultad"
+        [options]="facultadOptions"
+        optionLabel="label"
+        optionValue="value"
+        [filter]="true"
+        appendTo="body"
+        styleClass="field__input"
+      />
+      <small class="field__hint">Todo programa pertenece a una facultad. Las solicitudes que lo elijan quedan dirigidas a ella.</small>
     </div>
 
     <div class="field">

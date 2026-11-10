@@ -1,9 +1,25 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AlcanceVinculacion, EstadoProyecto, TipoIntervencion } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export const ORDENES_PROYECTO = [
+  'RECIENTES',
+  'FECHA_INICIO_DESC',
+  'FECHA_INICIO_ASC',
+  'GASTO_DESC',
+  'GASTO_ASC',
+  'ALUMNOS_DESC',
+  'ALUMNOS_ASC',
+] as const;
+export type OrdenProyecto = (typeof ORDENES_PROYECTO)[number];
 
 export class QueryProyectosDto {
+  @ApiPropertyOptional({ enum: ORDENES_PROYECTO, example: 'RECIENTES' })
+  @IsOptional()
+  @IsIn(ORDENES_PROYECTO)
+  orden?: OrdenProyecto;
+
   @ApiPropertyOptional({ enum: EstadoProyecto, example: EstadoProyecto.EN_PROCESO })
   @IsOptional()
   @IsEnum(EstadoProyecto)

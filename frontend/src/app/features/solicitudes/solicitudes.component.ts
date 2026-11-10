@@ -25,6 +25,9 @@ import { PAISES } from '../../core/constants/paises';
 import { COMUNAS_MAULE } from '../../core/constants/comunas-maule';
 
 
+/** Valor del selector de programa para "mi solicitud no encaja con ningún programa". */
+const SIN_PROGRAMA = 0;
+
 interface CarreraOption {
   id: number;
   label: string;
@@ -223,6 +226,53 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     return this.programas.find((p) => p.id === id) ?? null;
   }
 
+  /** Opción final de la lista: la solicitud no encaja en ningún programa y se elige la facultad. */
+  readonly SIN_PROGRAMA = SIN_PROGRAMA;
+  get sinPrograma(): boolean { return this.form.get('programaId')?.value === SIN_PROGRAMA; }
+
+  /** Programas ofrecidos (el docente solo ve los de su facultad) más la opción "no encaja". */
+  get programaOpciones(): Programa[] {
+    let lista = this.programas;
+    if (this.formIniciativa) {
+      const fac = this.carrerasDropdown[0]?.facultadId;
+      if (fac) lista = lista.filter((p) => p.facultadId === fac);
+    }
+    return [...lista, { id: SIN_PROGRAMA, nombre: 'Mi solicitud no encaja con ningún programa', orden: 9999, activo: true }];
+  }
+
+  /** Mientras hay un programa elegido, la facultad es la del programa y no se puede cambiar. */
+  facultadBloqueada = false;
+
+  /**
+   * Mantiene la facultad coherente con el programa: con programa se fija y se bloquea; con
+   * "no encaja" se libera y es obligatoria (salvo iniciativa de docente, cuya carrera ya es fija).
+   */
+  private sincronizarFacultad(): void {
+    const fac = this.form.get('facultadId')!;
+    const car = this.form.get('carreraId')!;
+    const prog = this.programaElegido;
+    if (prog?.facultadId) {
+      if (fac.value !== prog.facultadId) {
+        fac.setValue(prog.facultadId, { emitEvent: false });
+        const c = this.carrerasDropdown.find((x) => x.id === car.value);
+        if (c && c.facultadId !== prog.facultadId) car.setValue(null, { emitEvent: false });
+      }
+      this.facultadBloqueada = true;
+      fac.clearValidators();
+      if (fac.enabled) fac.disable({ emitEvent: false });
+    } else {
+      if (this.facultadBloqueada) {
+        // venía de un programa: se vuelve a pedir la facultad
+        fac.setValue(null, { emitEvent: false });
+        car.setValue(null, { emitEvent: false });
+      }
+      this.facultadBloqueada = false;
+      if (!this.viewOnly && fac.disabled) fac.enable({ emitEvent: false });
+      fac.setValidators(this.sinPrograma && !this.formIniciativa ? [Validators.required] : []);
+    }
+    fac.updateValueAndValidity({ emitEvent: false });
+  }
+
   /** Actividades del programa como lista (se guardan una por línea). */
   actividadesDe(p: Programa | null): string[] {
     return (p?.actividades ?? '').split('\n').map((a) => a.trim()).filter(Boolean);
@@ -261,6 +311,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     // Si elige "Otro", debe escribir qué tipo de cliente es
     // Los campos de ubicación obligatorios dependen del alcance elegido
     this.form.get('alcance')!.valueChanges.subscribe(() => this.aplicarValidacionAlcance());
+    this.form.get('programaId')!.valueChanges.subscribe(() => this.sincronizarFacultad());
 
     this.form.get('tipoCliente')!.valueChanges.subscribe((tipo) => {
       const otro = this.form.get('tipoClienteOtro')!;
@@ -523,7 +574,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
-      programaId: item.programaId ?? null,
+      programaId: item.programaId ?? SIN_PROGRAMA,
       alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
       region: item.region ?? null,
@@ -535,9 +586,10 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       tipoClienteOtro: item.tipoClienteOtro ?? '',
       nombreOrganizacion: item.nombreOrganizacion ?? '',
       personasPrevistas: item.personasPrevistas ?? null,
-      facultadId: this.carrerasDropdown.find(c => c.id === item.carreraId)?.facultadId ?? null,
+      facultadId: item.facultadId ?? this.carrerasDropdown.find(c => c.id === item.carreraId)?.facultadId ?? null,
       carreraId: item.carreraId ?? null,
     });
+    this.sincronizarFacultad();
   }
 
   get alcanceForm(): string { return this.form.get('alcance')?.value ?? 'REGIONAL'; }
@@ -602,6 +654,8 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.reset({ alcance: 'REGIONAL', tipoClienteOtro: '', nombreOrganizacion: '', telefono: this.telefonoPerfil, pais: '' });
     this.aplicarValidacionAlcance();
     this.form.enable();
+    this.facultadBloqueada = false;
+    this.sincronizarFacultad();
     this.aplicarValidacionIniciativa();
     this.dialogVisible = true;
   }
@@ -614,7 +668,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
     this.form.patchValue({
       titulo: item.titulo,
       descripcion: item.descripcion,
-      programaId: item.programaId ?? null,
+      programaId: item.programaId ?? SIN_PROGRAMA,
       alcance: item.alcance ?? 'REGIONAL',
       ciudad: item.ciudad ?? null,
       region: item.region ?? null,
@@ -626,13 +680,14 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       tipoClienteOtro: item.tipoClienteOtro ?? '',
       nombreOrganizacion: item.nombreOrganizacion ?? '',
       personasPrevistas: item.personasPrevistas ?? null,
-      facultadId: this.carrerasDropdown.find(c => c.id === item.carreraId)?.facultadId ?? null,
+      facultadId: item.facultadId ?? this.carrerasDropdown.find(c => c.id === item.carreraId)?.facultadId ?? null,
       carreraId: item.carreraId ?? null,
     });
     if (readonly) {
       this.form.disable();
     } else {
       this.form.enable();
+      this.sincronizarFacultad();
     }
     this.aplicarValidacionIniciativa();
     this.dialogVisible = true;
@@ -652,7 +707,8 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: UpdateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
-        programaId: raw.programaId,
+        programaId: raw.programaId === SIN_PROGRAMA ? null : raw.programaId,
+        facultadId: raw.facultadId || null,
         alcance: raw.alcance,
         ciudad: raw.ciudad || null,
         region: raw.region || null,
@@ -666,7 +722,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
           nombreOrganizacion: String(raw.nombreOrganizacion ?? '').trim(),
           personasPrevistas: raw.personasPrevistas || undefined,
         }),
-        carreraId: raw.carreraId || undefined,
+        carreraId: raw.carreraId || null,
       };
       this.service.update(this.editingItem.id, dto).subscribe({
         next: () => this.onSaveSuccess('Solicitud actualizada'),
@@ -676,7 +732,8 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
       const dto: CreateSolicitudDto = {
         titulo: raw.titulo,
         descripcion: raw.descripcion,
-        programaId: raw.programaId,
+        programaId: raw.programaId === SIN_PROGRAMA ? null : raw.programaId,
+        facultadId: raw.facultadId || null,
         alcance: raw.alcance,
         ciudad: raw.ciudad || null,
         region: raw.region || null,
@@ -816,7 +873,7 @@ export class SolicitudesComponent implements OnInit, OnDestroy {
         this.form.patchValue({
           titulo: actual.titulo,
           descripcion: actual.descripcion,
-          programaId: actual.programaId ?? null,
+          programaId: actual.programaId ?? SIN_PROGRAMA,
           alcance: actual.alcance ?? 'REGIONAL',
           ciudad: actual.ciudad ?? null,
           region: actual.region ?? null,

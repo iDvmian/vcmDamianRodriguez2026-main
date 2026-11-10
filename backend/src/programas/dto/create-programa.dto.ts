@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateProgramaDto {
@@ -26,6 +27,12 @@ export class CreateProgramaDto {
   @Min(0)
   @Max(1000)
   orden?: number;
+
+  @ApiProperty({ example: 1, description: 'Facultad a la que pertenece el programa (obligatoria)' })
+  @Type(() => Number)
+  @IsInt({ message: 'Selecciona la facultad del programa' })
+  @Min(1, { message: 'Selecciona la facultad del programa' })
+  facultadId: number;
 
   @ApiPropertyOptional({ example: true, description: 'Si está vigente para nuevas solicitudes' })
   @IsOptional()

@@ -95,6 +95,20 @@
       [style]="{ 'min-width': '200px' }"
       appendTo="body"
     />
+    <p-select
+      [(ngModel)]="orden"
+      (ngModelChange)="onFilterChange()"
+      [options]="ordenOptions"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Ordenar por"
+      [style]="{ 'min-width': '230px' }"
+      appendTo="body"
+    >
+      <ng-template pTemplate="selectedItem" let-sel>
+        <span><i class="ti ti-arrows-sort"></i> {{ sel?.label }}</span>
+      </ng-template>
+    </p-select>
     <button class="btn-secondary" type="button" (click)="clearFilters()">
       <i class="ti ti-filter-off"></i>
       Limpiar filtros

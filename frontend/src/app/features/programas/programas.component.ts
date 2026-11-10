@@ -6,15 +6,17 @@ import { TableModule } from 'primeng/table';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TagModule } from 'primeng/tag';
+import { SelectModule } from 'primeng/select';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { ProgramasService } from '../../core/services/programas.service';
+import { FacultadesService } from '../../core/services/facultades.service';
 import { Programa } from '../../core/models/programa.model';
 
 @Component({
   selector: 'app-programas',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule, TableModule, DialogModule, InputTextModule, TagModule, ToastModule],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule, TableModule, DialogModule, InputTextModule, TagModule, SelectModule, ToastModule],
   providers: [MessageService],
   templateUrl: './programas.component.html',
   styleUrl: './programas.component.scss',
@@ -22,6 +24,7 @@ import { Programa } from '../../core/models/programa.model';
 export class ProgramasComponent implements OnInit {
   items: Programa[] = [];
   loading = false;
+  facultadOptions: { label: string; value: number }[] = [];
 
   dialogVisible = false;
   editingItem: Programa | null = null;
@@ -32,6 +35,7 @@ export class ProgramasComponent implements OnInit {
 
   constructor(
     private service: ProgramasService,
+    private facultadesService: FacultadesService,
     private messageService: MessageService,
     private fb: FormBuilder,
   ) {
@@ -41,10 +45,18 @@ export class ProgramasComponent implements OnInit {
       actividades: ['', Validators.maxLength(2000)],
       orden: [0, [Validators.required, Validators.min(0), Validators.max(1000)]],
       activo: [true],
+      facultadId: [null, Validators.required],
     });
   }
 
   ngOnInit(): void {
+    this.facultadesService.getFacultades({ limit: 100 }).subscribe({
+      next: (res) => {
+        this.facultadOptions = res.items.map((f: any) => ({ label: f.nombre || f.etiqueta, value: f.id as number }));
+        this.cdr.detectChanges();
+      },
+      error: () => {},
+    });
     this.loadItems();
   }
 
@@ -71,7 +83,7 @@ export class ProgramasComponent implements OnInit {
   openCreate(): void {
     this.editingItem = null;
     const siguiente = this.items.reduce((m, p) => Math.max(m, p.orden), 0) + 1;
-    this.form.reset({ nombre: '', descripcion: '', actividades: '', orden: siguiente, activo: true });
+    this.form.reset({ nombre: '', descripcion: '', actividades: '', orden: siguiente, activo: true, facultadId: null });
     this.dialogVisible = true;
   }
 
@@ -83,6 +95,7 @@ export class ProgramasComponent implements OnInit {
       actividades: item.actividades ?? '',
       orden: item.orden,
       activo: item.activo,
+      facultadId: item.facultadId ?? null,
     });
     this.dialogVisible = true;
   }
@@ -100,6 +113,7 @@ export class ProgramasComponent implements OnInit {
       actividades: String(raw.actividades ?? '').trim() || null,
       orden: Number(raw.orden),
       activo: !!raw.activo,
+      facultadId: raw.facultadId,
     };
     const obs = this.editingItem ? this.service.actualizar(this.editingItem.id, dto) : this.service.crear(dto);
     obs.subscribe({

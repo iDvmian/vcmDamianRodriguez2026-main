@@ -93,6 +93,17 @@ export class ProyectosComponent implements OnInit {
   filtroProgramaId: number | null = null;
   filtroTipo: string | null = null;
   filtroAlcance: string | null = null;
+  orden = 'RECIENTES';
+
+  readonly ordenOptions = [
+    { label: 'Más recientes', value: 'RECIENTES' },
+    { label: 'Fecha de inicio: más reciente', value: 'FECHA_INICIO_DESC' },
+    { label: 'Fecha de inicio: más antigua', value: 'FECHA_INICIO_ASC' },
+    { label: 'Mayor gasto', value: 'GASTO_DESC' },
+    { label: 'Menor gasto', value: 'GASTO_ASC' },
+    { label: 'Más alumnos', value: 'ALUMNOS_DESC' },
+    { label: 'Menos alumnos', value: 'ALUMNOS_ASC' },
+  ];
 
   facultadFiltroOptions: { label: string; value: number }[] = [];
   private carrerasFiltroTodas: { label: string; value: number; facultadId: number | null }[] = [];
@@ -502,6 +513,7 @@ export class ProyectosComponent implements OnInit {
     if (this.filtroProgramaId !== null) params['programaId'] = this.filtroProgramaId;
     if (this.filtroTipo !== null) params['tipoIntervencion'] = this.filtroTipo;
     if (this.filtroAlcance !== null) params['alcance'] = this.filtroAlcance;
+    if (this.orden !== 'RECIENTES') params['orden'] = this.orden;
 
     const obs = this.useAllEndpoint
       ? this.service.getAll(params)
@@ -540,6 +552,7 @@ export class ProyectosComponent implements OnInit {
     this.filtroProgramaId = null;
     this.filtroTipo = null;
     this.filtroAlcance = null;
+    this.orden = 'RECIENTES';
     this.currentPage = 1;
     this.loadItems();
   }

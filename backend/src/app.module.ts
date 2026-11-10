@@ -8,6 +8,7 @@ import { AlumnosVoluntariosModule } from './alumnos-voluntarios/alumnos-voluntar
 import { CarrerasModule } from './carreras/carreras.module';
 import { FacultadesModule } from './facultades/facultades.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PlanEstrategicoModule } from './plan-estrategico/plan-estrategico.module';
 import { PlanteamientosModule } from './planteamientos/planteamientos.module';
 import { ProgramasModule } from './programas/programas.module';
 import { ProyectosModule } from './proyectos/proyectos.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     CarrerasModule,
     AlumnosVoluntariosModule,
     ProgramasModule,
+    PlanEstrategicoModule,
     SolicitudesModule,
     PlanteamientosModule,
     ProyectosModule,

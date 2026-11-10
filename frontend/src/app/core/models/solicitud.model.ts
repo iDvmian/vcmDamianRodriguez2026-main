@@ -61,6 +61,8 @@ export interface Solicitud {
   personasPrevistas?: number | null;
   programaId?: number | null;
   programa?: { id: number; nombre: string } | null;
+  facultadId?: number | null;
+  facultad?: { id: number; nombre: string; etiqueta: string } | null;
   carreraId?: number;
   carrera?: Pick<Carrera, 'id' | 'nombre' | 'etiqueta'>;
   clienteId: number;

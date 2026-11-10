@@ -146,6 +146,9 @@ model Facultad {
   etiqueta  String    @unique
   carreras  Carrera[]
   decanos   User[]    @relation("DecanoFacultad")
+  planesEstrategicos PlanEstrategico[]
+  programas Programa[]
+  solicitudes Solicitud[]
   createdAt DateTime  @default(now())
 }
 
@@ -184,6 +187,9 @@ model Programa {
   actividades String?     @db.Text
   orden       Int         @default(0)
   activo      Boolean     @default(true)
+  /// Facultad a la que pertenece el programa; null = programa de toda la universidad
+  facultadId  Int?
+  facultad    Facultad?   @relation(fields: [facultadId], references: [id], onDelete: SetNull)
   solicitudes Solicitud[]
 }
 
@@ -209,6 +215,9 @@ model Solicitud {
   carrera     Carrera?          @relation(fields: [carreraId], references: [id])
   programaId  Int?
   programa    Programa?         @relation(fields: [programaId], references: [id])
+  /// Facultad a la que se dirige la solicitud (la del programa, o la elegida si no encaja en ninguno)
+  facultadId  Int?
+  facultad    Facultad?         @relation(fields: [facultadId], references: [id])
   clienteId   Int
   cliente     User              @relation("ClienteSolicitud", fields: [clienteId], references: [id])
   archivos    ArchivoSolicitud[]
@@ -353,4 +362,72 @@ model RegistroDepuracion {
   borradoEn        DateTime @default(now())
 
   @@index([borradoEn])
+}
+
+// ─── Plan de Desarrollo Estratégico (por facultad) ───────────────────────────
+// Jerarquía: Plan → Eje → Objetivo global → (Objetivos específicos e Indicadores globales)
+
+model PlanEstrategico {
+  id         Int              @id @default(autoincrement())
+  periodo    String           @db.VarChar(50)
+  facultadId Int
+  facultad   Facultad         @relation(fields: [facultadId], references: [id], onDelete: Cascade)
+  /// Documento del PDE (PDF o Word) subido a Cloudinary
+  archivoUrl      String?     @db.VarChar(500)
+  archivoPublicId String?     @db.VarChar(255)
+  archivoNombre   String?     @db.VarChar(255)
+  ejes       EjeEstrategico[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([facultadId, periodo])
+}
+
+model EjeEstrategico {
+  id          Int               @id @default(autoincrement())
+  descripcion String            @db.Text
+  planId      Int
+  plan        PlanEstrategico   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  objetivos   ObjetivoGlobal[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([planId])
+}
+
+model ObjetivoGlobal {
+  id            Int                   @id @default(autoincrement())
+  descripcion   String                @db.Text
+  ejeId         Int
+  eje           EjeEstrategico        @relation(fields: [ejeId], references: [id], onDelete: Cascade)
+  especificos   ObjetivoEspecifico[]
+  indicadores   IndicadorGlobal[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([ejeId])
+}
+
+model ObjetivoEspecifico {
+  id               Int               @id @default(autoincrement())
+  descripcion      String            @db.Text
+  objetivoGlobalId Int
+  objetivoGlobal   ObjetivoGlobal    @relation(fields: [objetivoGlobalId], references: [id], onDelete: Cascade)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([objetivoGlobalId])
+}
+
+model IndicadorGlobal {
+  id               Int            @id @default(autoincrement())
+  descripcion      String         @db.Text
+  /// Objetivo global institucional al que responde, ej: "UCM OG 2"
+  referenciaUcm    String?        @db.VarChar(50)
+  objetivoGlobalId Int
+  objetivoGlobal   ObjetivoGlobal @relation(fields: [objetivoGlobalId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([objetivoGlobalId])
 }

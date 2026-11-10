@@ -10,7 +10,10 @@ import { PaginatedResponse } from '../models/paginated-response.model';
 export interface CreateSolicitudDto {
   titulo: string;
   descripcion: string;
-  programaId: number;
+  /** Vacío si la solicitud no encaja en ningún programa. */
+  programaId?: number | null;
+  /** Obligatoria si no hay programa; con programa es la del programa. */
+  facultadId?: number | null;
   alcance: AlcanceVinculacion;
   ciudad?: string | null;
   region?: string | null;
@@ -22,13 +25,14 @@ export interface CreateSolicitudDto {
   tipoClienteOtro?: string;
   nombreOrganizacion?: string;
   personasPrevistas?: number | null;
-  carreraId?: number;
+  carreraId?: number | null;
 }
 
 export interface UpdateSolicitudDto {
   titulo?: string;
   descripcion?: string;
-  programaId?: number;
+  programaId?: number | null;
+  facultadId?: number | null;
   alcance?: AlcanceVinculacion;
   ciudad?: string | null;
   region?: string | null;
@@ -40,7 +44,7 @@ export interface UpdateSolicitudDto {
   tipoClienteOtro?: string;
   nombreOrganizacion?: string;
   personasPrevistas?: number | null;
-  carreraId?: number;
+  carreraId?: number | null;
 }
 
 export interface GestionarSolicitudDto {

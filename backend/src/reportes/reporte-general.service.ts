@@ -56,6 +56,7 @@ const CATALOGO: Record<TipoReporte, Columna[]> = {
     { key: 'fechaInicio', label: 'Inicio', peso: 9, defecto: true },
     { key: 'fechaFin', label: 'Fin', peso: 9, defecto: true },
     { key: 'horas', label: 'Horas hombre', peso: 7, defecto: true },
+    { key: 'gasto', label: 'Gasto del proyecto', peso: 10, defecto: true },
     { key: 'docentes', label: 'Docentes', peso: 7, defecto: false },
     { key: 'estudiantes', label: 'Estudiantes', peso: 8, defecto: false },
     { key: 'docentesExt', label: 'Docentes externos', peso: 8, defecto: false },
@@ -115,6 +116,7 @@ const fmtTipo = (t: string | null | undefined, otro?: string | null): string => 
 };
 const nombre = (u: { nombres: string; apellidos: string } | null | undefined): string =>
   u ? `${u.nombres} ${u.apellidos}` : '—';
+const pesos = (n: number): string => `$${n.toLocaleString('es-CL')}`;
 const num = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : String(n));
 
 export interface ReporteResultado {
@@ -129,6 +131,7 @@ export interface ReporteResultado {
     porEstado: { estado: string; cantidad: number }[];
     horasTotales: number | null;
     personasTotales: number | null;
+    gastoTotal: number | null;
   };
   filtros: string[];
 }
@@ -186,7 +189,7 @@ export class ReporteGeneralService {
 
     const solicitudWhere: Prisma.SolicitudWhereInput = {};
     if (carreraId !== undefined) solicitudWhere.carreraId = carreraId;
-    if (facultadId !== undefined) solicitudWhere.carrera = { is: { facultadId } };
+    if (facultadId !== undefined) solicitudWhere.facultadId = facultadId;
     if (query.ciudad) solicitudWhere.ciudad = query.ciudad;
 
     const docenteWhere: Prisma.UserWhereInput | undefined = query.docente?.trim()
@@ -212,7 +215,7 @@ export class ReporteGeneralService {
     let columnas = CATALOGO[tipo].filter((c) => pedidas.includes(c.key));
     if (!columnas.length) columnas = CATALOGO[tipo].filter((c) => c.defecto);
 
-    let filasRaw: { fila: Record<string, string>; estado: string; horas: number; personas: number }[] = [];
+    let filasRaw: { fila: Record<string, string>; estado: string; horas: number; personas: number; gasto?: number }[] = [];
     let total = 0;
 
     if (tipo === 'SOLICITUDES') {
@@ -230,6 +233,7 @@ export class ReporteGeneralService {
           where,
           include: {
             carrera: { include: { facultad: true } },
+            facultad: true,
             cliente: { select: { nombres: true, apellidos: true, email: true } },
             planteamiento: { select: { id: true, proyecto: { select: { id: true } } } },
           },
@@ -251,7 +255,7 @@ export class ReporteGeneralService {
           correo: s.cliente?.email ?? '—',
           telefono: s.telefono ?? '—',
           carrera: s.carrera?.nombre ?? '—',
-          facultad: s.carrera?.facultad?.etiqueta ?? '—',
+          facultad: s.facultad?.etiqueta ?? s.carrera?.facultad?.etiqueta ?? '—',
           ciudad: s.ciudad ?? '—',
           direccion: [s.direccion, s.numeroDireccion].filter(Boolean).join(' ') || '—',
           fecha: fmtFecha(s.createdAt),
@@ -322,6 +326,7 @@ export class ReporteGeneralService {
               },
             },
             alumnos: { include: { alumno: { select: { nombres: true, apellidos: true } } } },
+            costos: { select: { tipo: true, monto: true } },
           },
           orderBy: { fechaInicio: orderDir },
           take: LIMITE_MAXIMO,
@@ -337,10 +342,13 @@ export class ReporteGeneralService {
           (p.participantesDocentesExternos ?? 0) +
           (p.participantesAlumnosExternos ?? 0) +
           (p.participantesOtrosExternos ?? 0);
+        // Solo se informa el gasto (los aportes no se consideran)
+        const gasto = (p.costos ?? []).filter((c: any) => c.tipo === 'GASTO').reduce((a: number, c: any) => a + c.monto, 0);
         return {
           estado: p.estado,
           horas: pl?.horasHombre ?? 0,
           personas: totalPersonas,
+          gasto,
           fila: {
             id: String(p.id),
             titulo: pl?.solicitud?.titulo ?? '—',
@@ -352,6 +360,7 @@ export class ReporteGeneralService {
             fechaInicio: fmtFecha(p.fechaInicio),
             fechaFin: fmtFecha(p.fechaFin),
             horas: num(pl?.horasHombre),
+            gasto: gasto > 0 ? pesos(gasto) : '—',
             docentes: num(p.participantesDocentes),
             estudiantes: num(p.participantesEstudiantes),
             docentesExt: num(p.participantesDocentesExternos),
@@ -368,10 +377,12 @@ export class ReporteGeneralService {
     const conteo = new Map<string, number>();
     let horas = 0;
     let personas = 0;
+    let gastoTotal = 0;
     for (const f of filasRaw) {
       conteo.set(f.estado, (conteo.get(f.estado) ?? 0) + 1);
       horas += f.horas;
       personas += f.personas;
+      gastoTotal += f.gasto ?? 0;
     }
     const porEstado = ESTADOS_VALIDOS[tipo].map((e) => ({ estado: fmtEstado(e), cantidad: conteo.get(e) ?? 0 }));
 
@@ -394,6 +405,7 @@ export class ReporteGeneralService {
         porEstado,
         horasTotales: tipo === 'SOLICITUDES' ? null : horas,
         personasTotales: tipo === 'PROYECTOS' ? personas : null,
+        gastoTotal: tipo === 'PROYECTOS' ? gastoTotal : null,
       },
       filtros: await this.describirFiltros(query, carreraId, user),
     };
@@ -514,6 +526,7 @@ export class ReporteGeneralService {
         doc.text(`Registros por estado: ${r.resumen.porEstado.map((e) => `${e.estado}: ${e.cantidad}`).join('   ')}`, M, doc.y, { width: pageW });
         if (r.resumen.horasTotales !== null) doc.text(`Horas hombre totales: ${r.resumen.horasTotales}`, M, doc.y, { width: pageW });
         if (r.resumen.personasTotales !== null) doc.text(`Personas alcanzadas (total): ${r.resumen.personasTotales}`, M, doc.y, { width: pageW });
+        if (r.resumen.gastoTotal !== null) doc.text(`Gasto total de los proyectos: ${pesos(r.resumen.gastoTotal)}`, M, doc.y, { width: pageW });
       }
 
       // Pie de página en todas las páginas

@@ -12,6 +12,8 @@ export interface DashboardResumen {
   horasHombre: number;
   participantes: { docentes: number; estudiantes: number; docentesExternos: number; alumnosExternos: number; otrosExternos: number; total: number };
   alumnosVoluntarios: number;
+  /** Costos de los proyectos: neto = gastos − aportes/ingresos. */
+  costos: { gastos: number; ingresos: number; neto: number; proyectosConCostos: number };
   duracionPromedioDias: number | null;
   tiempoRespuestaPromedioDias: number | null;
 }
@@ -86,8 +88,23 @@ export interface UbicacionContada {
   proyectos: number;
 }
 
+export interface CostoAgrupado {
+  gastos: number;
+  ingresos: number;
+  neto: number;
+  proyectos: number;
+}
+
+export interface AnalisisCostos {
+  porFacultad: (CostoAgrupado & { facultadId: number; facultad: string; etiqueta: string })[];
+  porCarrera: (CostoAgrupado & { carrera: string; etiqueta: string })[];
+  porTipo: (CostoAgrupado & { tipo: string })[];
+  topProyectos: { proyectoId: number; titulo: string; carrera: string; facultad: string; gastos: number; ingresos: number; neto: number; personas: number }[];
+}
+
 export interface Dashboard {
   resumen: DashboardResumen;
+  analisisCostos: AnalisisCostos;
   porFacultad: FacultadComparada[];
   porMes: { mes: string; solicitudes: number; proyectos: number }[];
   porTipoIntervencion: { tipo: string; planteamientos: number; proyectos: number; horasHombre: number }[];

@@ -70,6 +70,11 @@ export class NavbarComponent {
     return this.authService.getCurrentUser()?.rol === 'DOCENTE';
   }
 
+  get showPlanEstrategico(): boolean {
+    const rol = this.authService.getCurrentUser()?.rol;
+    return !!rol && rol !== 'CLIENTE';
+  }
+
   get showProyectos(): boolean {
     const rol = this.authService.getCurrentUser()?.rol;
     return !!rol && rol !== 'CLIENTE';

@@ -35,7 +35,7 @@ export class DashboardService {
     // El Decano queda limitado a su facultad. Admin y Director ven todas; la facultad y la carrera
     // se filtran después en memoria para poder comparar todas las facultades entre sí.
     const facultadDecano = await facultadDelDecano(this.prisma, user);
-    if (facultadDecano !== null) where.carrera = { is: { facultadId: facultadDecano } };
+    if (facultadDecano !== null) where.facultadId = facultadDecano;
     const facultadSel = facultadDecano ?? query.facultadId;
     if (query.tipoIntervencion) {
       where.planteamiento = { is: { tipoIntervencion: query.tipoIntervencion } };
@@ -45,6 +45,7 @@ export class DashboardService {
       where,
       include: {
         programa: { select: { id: true, nombre: true } },
+        facultad: { select: { id: true, nombre: true, etiqueta: true } },
         carrera: {
           select: {
             id: true,
@@ -59,6 +60,7 @@ export class DashboardService {
             docente: { select: { id: true, nombres: true, apellidos: true, carrera: { select: { nombre: true, facultad: { select: { nombre: true } } } } } },
             proyecto: {
               include: {
+                costos: { select: { tipo: true, monto: true } },
                 alumnos: {
                   include: {
                     alumno: { select: { id: true, nombres: true, apellidos: true, carrera: { select: { nombre: true } } } },
@@ -74,7 +76,7 @@ export class DashboardService {
 
     const solicitudes = todas.filter(
       (s) =>
-        (facultadSel === undefined || s.carrera?.facultadId === facultadSel) &&
+        (facultadSel === undefined || s.facultadId === facultadSel) &&
         (query.carreraId === undefined || s.carreraId === query.carreraId),
     );
 
@@ -88,10 +90,10 @@ export class DashboardService {
       docentes: number; estudiantes: number; docentesExternos: number; alumnosExternos: number; otrosExternos: number;
     }>();
     for (const s of todas) {
-      if (!s.carrera) continue;
-      const fid = s.carrera.facultadId;
+      if (!s.facultad) continue;
+      const fid = s.facultad.id;
       const f = facultades.get(fid) ?? {
-        facultadId: fid, facultad: s.carrera.facultad.nombre, etiqueta: s.carrera.facultad.etiqueta,
+        facultadId: fid, facultad: s.facultad.nombre, etiqueta: s.facultad.etiqueta,
         solicitudes: 0, aprobadas: 0, rechazadas: 0, pendientes: 0,
         planteamientos: 0, proyectos: 0, finalizados: 0, enProceso: 0, pausados: 0, cancelados: 0,
         horasHombre: 0, participantes: 0, alumnos: new Set<number>(),
@@ -142,6 +144,7 @@ export class DashboardService {
     const proyectos = planteamientos.flatMap((p) => (p.proyecto ? [{ ...p.proyecto, plant: p }] : []));
     const proyPorEstado = { EN_PROCESO: 0, PAUSADO: 0, FINALIZADO: 0, CANCELADO: 0 };
     let horasHombre = 0;
+    const costos = { gastos: 0, ingresos: 0, proyectosConCostos: 0 };
     let sumaDuracionMs = 0;
     const participantes = { docentes: 0, estudiantes: 0, docentesExternos: 0, alumnosExternos: 0, otrosExternos: 0 };
     const alumnosSet = new Set<number>();
@@ -155,7 +158,67 @@ export class DashboardService {
       participantes.alumnosExternos += pr.participantesAlumnosExternos ?? 0;
       participantes.otrosExternos += pr.participantesOtrosExternos ?? 0;
       for (const a of pr.alumnos) alumnosSet.add(a.alumnoId);
+      if (pr.costos.length) costos.proyectosConCostos++;
+      for (const c of pr.costos) {
+        if (c.tipo === 'GASTO') costos.gastos += c.monto;
+        else costos.ingresos += c.monto;
+      }
     }
+
+    // ── Análisis de costos ───────────────────────────────────────────────────
+    type Acum = { gastos: number; ingresos: number; proyectos: number };
+    const acumular = (m: Map<string, Acum & Record<string, unknown>>, key: string, base: Record<string, unknown>, g: number, i: number) => {
+      const x = m.get(key) ?? ({ ...base, gastos: 0, ingresos: 0, proyectos: 0 } as Acum & Record<string, unknown>);
+      x.gastos += g;
+      x.ingresos += i;
+      x.proyectos++;
+      m.set(key, x);
+    };
+    const totalesCosto = (cs: { tipo: string; monto: number }[]) => ({
+      gastos: cs.filter((c) => c.tipo === 'GASTO').reduce((a, c) => a + c.monto, 0),
+      ingresos: cs.filter((c) => c.tipo !== 'GASTO').reduce((a, c) => a + c.monto, 0),
+    });
+    const conNeto = <T extends Acum>(x: T) => ({ ...x, neto: x.gastos - x.ingresos });
+
+    // Por facultad: sobre todas las visibles (igual que la comparación entre facultades)
+    const costoFacultad = new Map<string, Acum & Record<string, unknown>>();
+    for (const s of todas) {
+      const pr = s.planteamiento?.proyecto;
+      if (!pr || !pr.costos.length || !s.facultad) continue;
+      const t = totalesCosto(pr.costos);
+      acumular(costoFacultad, String(s.facultad.id), { facultadId: s.facultad.id, facultad: s.facultad.nombre, etiqueta: s.facultad.etiqueta }, t.gastos, t.ingresos);
+    }
+    // Por carrera, por tipo y ranking de proyectos: sobre las solicitudes filtradas
+    const costoCarrera = new Map<string, Acum & Record<string, unknown>>();
+    const costoTipo = new Map<string, Acum & Record<string, unknown>>();
+    const costoProyectos: { proyectoId: number; titulo: string; carrera: string; facultad: string; gastos: number; ingresos: number; neto: number; personas: number }[] = [];
+    for (const s of solicitudes) {
+      const pr = s.planteamiento?.proyecto;
+      if (!pr || !pr.costos.length) continue;
+      const t = totalesCosto(pr.costos);
+      acumular(costoCarrera, String(s.carreraId ?? 'sin'), { carrera: s.carrera?.nombre ?? 'Sin carrera', etiqueta: s.carrera?.etiqueta ?? 'Sin carrera' }, t.gastos, t.ingresos);
+      acumular(costoTipo, s.planteamiento?.tipoIntervencion ?? 'SIN_TIPO', { tipo: s.planteamiento?.tipoIntervencion ?? 'SIN_TIPO' }, t.gastos, t.ingresos);
+      costoProyectos.push({
+        proyectoId: pr.id,
+        titulo: s.titulo,
+        carrera: s.carrera?.etiqueta ?? '—',
+        facultad: s.facultad?.etiqueta ?? '—',
+        gastos: t.gastos,
+        ingresos: t.ingresos,
+        neto: t.gastos - t.ingresos,
+        personas:
+          (pr.participantesDocentes ?? 0) + (pr.participantesEstudiantes ?? 0) + (pr.participantesDocentesExternos ?? 0) +
+          (pr.participantesAlumnosExternos ?? 0) + (pr.participantesOtrosExternos ?? 0),
+      });
+    }
+    const ordenar = (m: Map<string, Acum & Record<string, unknown>>) =>
+      [...m.values()].map((x) => conNeto(x)).sort((a, b) => b.gastos - a.gastos);
+    const analisisCostos = {
+      porFacultad: ordenar(costoFacultad),
+      porCarrera: ordenar(costoCarrera),
+      porTipo: ordenar(costoTipo),
+      topProyectos: costoProyectos.sort((a, b) => b.gastos - a.gastos).slice(0, 10),
+    };
 
     // ── Serie mensual ────────────────────────────────────────────────────────
     const meses = new Map<string, { solicitudes: number; proyectos: number }>();
@@ -337,10 +400,17 @@ export class DashboardService {
         horasHombre,
         participantes: { ...participantes, total: participantes.docentes + participantes.estudiantes + participantes.docentesExternos + participantes.alumnosExternos + participantes.otrosExternos },
         alumnosVoluntarios: alumnosSet.size,
+        costos: {
+          gastos: costos.gastos,
+          ingresos: costos.ingresos,
+          neto: costos.gastos - costos.ingresos,
+          proyectosConCostos: costos.proyectosConCostos,
+        },
         duracionPromedioDias: proyectos.length ? round1(sumaDuracionMs / proyectos.length / DIA_MS) : null,
         tiempoRespuestaPromedioDias: tiempoRespuestaReal,
       },
       porMes,
+      analisisCostos,
       porFacultad,
       porTipoIntervencion,
       porCarrera,

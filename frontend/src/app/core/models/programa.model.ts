@@ -6,6 +6,9 @@ export interface Programa {
   actividades?: string | null;
   orden: number;
   activo: boolean;
+  /** Facultad a la que pertenece el programa. */
+  facultadId?: number | null;
+  facultad?: { id: number; nombre: string; etiqueta: string } | null;
   /** Solo en la vista de administración. */
   _count?: { solicitudes: number };
 }

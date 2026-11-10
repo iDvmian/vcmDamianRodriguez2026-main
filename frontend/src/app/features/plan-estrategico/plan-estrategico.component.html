@@ -1,0 +1,201 @@
+<p-toast position="top-right" />
+<p-confirmdialog />
+
+<div class="page">
+  <div class="page__header">
+    <h1 class="page__title"><i class="ti ti-target-arrow"></i> Plan de Desarrollo Estratégico</h1>
+    <p-select
+      *ngIf="!esDecano"
+      [(ngModel)]="facultadId"
+      (ngModelChange)="onFacultadChange()"
+      [options]="facultades"
+      optionLabel="label"
+      optionValue="value"
+      placeholder="Facultad"
+      [filter]="true"
+      [style]="{ 'min-width': '320px' }"
+      appendTo="body"
+    />
+    <span *ngIf="esDecano && facultadNombre" class="facultad-chip">{{ facultadNombre }}</span>
+  </div>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title"><i class="ti ti-file-description"></i> Plan de Desarrollo Estratégico (PDE)</h2>
+      <button *ngIf="canEdit" class="btn-primary" (click)="openCreate('plan')"><i class="ti ti-plus"></i> PDE</button>
+    </div>
+    <table class="tabla">
+      <thead><tr><th class="c-check"></th><th class="c-id">N.º</th><th>Período</th><th class="c-arch">Documento</th><th class="c-acc">Acción</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of planes; let i = index" [class.fila--sel]="item.id === planId" (click)="selectPlan(item)">
+          <td class="c-check"><i *ngIf="item.id === planId" class="ti ti-check"></i></td>
+          <td class="c-id">{{ i + 1 }}</td>
+          <td class="c-desc">{{ item.periodo }}</td>
+          <td class="c-arch">
+            <a *ngIf="item.archivoUrl; else sinArch" class="arch" [href]="item.archivoUrl" target="_blank" rel="noopener" [title]="'Abrir ' + (item.archivoNombre || 'documento')" (click)="$event.stopPropagation()">
+              <i class="ti" [ngClass]="iconoArchivo(item.archivoNombre)"></i>
+              <span class="arch__nombre">{{ item.archivoNombre || 'Documento' }}</span>
+            </a>
+            <ng-template #sinArch><span class="muted">—</span></ng-template>
+          </td>
+          <td class="c-acc">
+            <div class="acciones" *ngIf="canEdit">
+              <button class="btn-icon btn-icon--edit" (click)="$event.stopPropagation(); openEdit('plan', item)" title="Editar"><i class="ti ti-edit"></i></button>
+              <button class="btn-icon btn-icon--delete" (click)="$event.stopPropagation(); confirmDelete('plan', item.id, item.periodo)" title="Eliminar"><i class="ti ti-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!planes.length"><td [attr.colspan]="5" class="vacio">Esta facultad aún no tiene un PDE. Crea el primero con el botón PDE.</td></tr>
+      </tbody>
+    </table>
+    <div class="info" *ngIf="planId !== null"><i class="ti ti-info-circle"></i><span><b>PDE seleccionado: {{ planActual?.periodo }}.</b> Los ejes estratégicos, objetivos e indicadores mostrados corresponden a este PDE.</span></div>
+  </section>
+
+  <section class="panel" *ngIf="plan">
+    <div class="panel__head">
+      <h2 class="panel__title"><i class="ti ti-stack-2"></i> Ejes Estratégicos (EJ)</h2>
+      <button *ngIf="canEdit" class="btn-primary" (click)="openCreate('ejes')"><i class="ti ti-plus"></i> EJ</button>
+    </div>
+    <table class="tabla">
+      <thead><tr><th class="c-check"></th><th class="c-id">N.º</th><th>Descripción</th><th class="c-acc">Acción</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of ejes; let i = index" [class.fila--sel]="item.id === ejeId" (click)="selectEje(item)">
+          <td class="c-check"><i *ngIf="item.id === ejeId" class="ti ti-check"></i></td>
+          <td class="c-id">{{ i + 1 }}</td>
+          <td class="c-desc">{{ item.descripcion }}</td>
+          <td class="c-acc">
+            <div class="acciones" *ngIf="canEdit">
+              <button class="btn-icon btn-icon--edit" (click)="$event.stopPropagation(); openEdit('ejes', item)" title="Editar"><i class="ti ti-edit"></i></button>
+              <button class="btn-icon btn-icon--delete" (click)="$event.stopPropagation(); confirmDelete('ejes', item.id, item.descripcion)" title="Eliminar"><i class="ti ti-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!ejes.length"><td [attr.colspan]="4" class="vacio">Aún no hay ejes en este PDE.</td></tr>
+      </tbody>
+    </table>
+    <div class="info" *ngIf="ejeId !== null"><i class="ti ti-info-circle"></i><span><b>Eje seleccionado: {{ eje?.descripcion }}.</b> Los objetivos globales mostrados corresponden a este eje.</span></div>
+  </section>
+
+  <section class="panel" *ngIf="plan && eje">
+    <div class="panel__head">
+      <h2 class="panel__title"><i class="ti ti-target"></i> Objetivo Global</h2>
+      <button *ngIf="canEdit" class="btn-primary" (click)="openCreate('objetivos-globales')"><i class="ti ti-plus"></i> OG</button>
+    </div>
+    <table class="tabla">
+      <thead><tr><th class="c-check"></th><th class="c-id">N.º</th><th>Descripción</th><th class="c-acc">Acción</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of objetivos; let i = index" [class.fila--sel]="item.id === ogId" (click)="selectOg(item)">
+          <td class="c-check"><i *ngIf="item.id === ogId" class="ti ti-check"></i></td>
+          <td class="c-id">{{ i + 1 }}</td>
+          <td class="c-desc">{{ item.descripcion }}</td>
+          <td class="c-acc">
+            <div class="acciones" *ngIf="canEdit">
+              <button class="btn-icon btn-icon--edit" (click)="$event.stopPropagation(); openEdit('objetivos-globales', item)" title="Editar"><i class="ti ti-edit"></i></button>
+              <button class="btn-icon btn-icon--delete" (click)="$event.stopPropagation(); confirmDelete('objetivos-globales', item.id, item.descripcion)" title="Eliminar"><i class="ti ti-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!objetivos.length"><td [attr.colspan]="4" class="vacio">Aún no hay objetivos globales en este eje.</td></tr>
+      </tbody>
+    </table>
+    <div class="info" *ngIf="ogId !== null"><i class="ti ti-info-circle"></i><span><b>Objetivo global seleccionado: {{ og?.descripcion }}.</b> Los objetivos específicos e indicadores globales mostrados corresponden a este objetivo.</span></div>
+  </section>
+
+  <section class="panel" *ngIf="plan && eje && og">
+    <div class="panel__head">
+      <h2 class="panel__title"><i class="ti ti-flag"></i> Objetivo Específico</h2>
+      <button *ngIf="canEdit" class="btn-primary" (click)="openCreate('objetivos-especificos')"><i class="ti ti-plus"></i> OE</button>
+    </div>
+    <table class="tabla">
+      <thead><tr><th class="c-check"></th><th class="c-id">N.º</th><th>Descripción</th><th class="c-acc">Acción</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of especificos; let i = index" style="cursor: default">
+          <td class="c-check"></td>
+          <td class="c-id">{{ i + 1 }}</td>
+          <td class="c-desc">{{ item.descripcion }}</td>
+          <td class="c-acc">
+            <div class="acciones" *ngIf="canEdit">
+              <button class="btn-icon btn-icon--edit" (click)="$event.stopPropagation(); openEdit('objetivos-especificos', item)" title="Editar"><i class="ti ti-edit"></i></button>
+              <button class="btn-icon btn-icon--delete" (click)="$event.stopPropagation(); confirmDelete('objetivos-especificos', item.id, item.descripcion)" title="Eliminar"><i class="ti ti-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!especificos.length"><td [attr.colspan]="4" class="vacio">Aún no hay objetivos específicos en este objetivo global.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel" *ngIf="plan && eje && og">
+    <div class="panel__head">
+      <h2 class="panel__title"><i class="ti ti-chart-bar"></i> Indicador Global</h2>
+      <button *ngIf="canEdit" class="btn-primary" (click)="openCreate('indicadores')"><i class="ti ti-plus"></i> IND</button>
+    </div>
+    <table class="tabla">
+      <thead><tr><th class="c-check"></th><th class="c-id">N.º</th><th>Descripción</th><th class="c-ref">Ref. UCM</th><th class="c-acc">Acción</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of indicadores; let i = index">
+          <td class="c-check"></td>
+          <td class="c-id">{{ i + 1 }}</td>
+          <td class="c-desc">{{ item.descripcion }}</td>
+          <td class="c-ref"><span *ngIf="item.referenciaUcm; else sinRef" class="ref">{{ item.referenciaUcm }}</span><ng-template #sinRef><span class="muted">—</span></ng-template></td>
+          <td class="c-acc">
+            <div class="acciones" *ngIf="canEdit">
+              <button class="btn-icon btn-icon--edit" (click)="$event.stopPropagation(); openEdit('indicadores', item)" title="Editar"><i class="ti ti-edit"></i></button>
+              <button class="btn-icon btn-icon--delete" (click)="$event.stopPropagation(); confirmDelete('indicadores', item.id, item.descripcion)" title="Eliminar"><i class="ti ti-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!indicadores.length"><td [attr.colspan]="5" class="vacio">Aún no hay indicadores en este objetivo global.</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<p-dialog
+  [(visible)]="dialogVisible"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '560px', maxWidth: '95vw' }"
+  [header]="dialogTitulo"
+>
+  <div class="field">
+    <label class="field__label">{{ dialogElemento === 'plan' ? 'Período' : 'Descripción' }} <span class="required">*</span></label>
+    <input *ngIf="dialogElemento === 'plan'" class="field__input" [(ngModel)]="texto" maxlength="50" placeholder="Ej: 2024 – 2028" />
+    <textarea *ngIf="dialogElemento !== 'plan'" class="field__input field__textarea" rows="5" [(ngModel)]="texto" maxlength="2000"></textarea>
+  </div>
+  <div class="field" *ngIf="dialogElemento === 'indicadores'">
+    <label class="field__label">Referencia UCM</label>
+    <input class="field__input" [(ngModel)]="referenciaUcm" maxlength="50" placeholder="Ej: UCM OG 2" />
+    <small class="field__hint">Opcional. Indica a qué objetivo global institucional responde este indicador.</small>
+  </div>
+
+  <div class="field" *ngIf="dialogElemento === 'plan'">
+    <label class="field__label">Documento del PDE</label>
+    <div class="archivo" *ngIf="archivo; else sinNuevo">
+      <i class="ti ti-file-text"></i> <span class="archivo__nombre">{{ archivo.name }}</span>
+      <button type="button" class="archivo__quitar" (click)="archivo = null" title="Quitar"><i class="ti ti-x"></i></button>
+    </div>
+    <ng-template #sinNuevo>
+      <div class="archivo" *ngIf="archivoActual && !quitarArchivoActual">
+        <i class="ti ti-file-text"></i> <span class="archivo__nombre">{{ archivoActual }}</span>
+        <button type="button" class="archivo__quitar" (click)="quitarArchivoActual = true" title="Quitar archivo"><i class="ti ti-x"></i></button>
+      </div>
+    </ng-template>
+    <label class="archivo__subir">
+      <i class="ti ti-upload"></i> {{ archivo || (archivoActual && !quitarArchivoActual) ? 'Reemplazar archivo' : 'Subir archivo' }}
+      <input type="file" accept=".pdf,.doc,.docx" (change)="onArchivoElegido($event)" hidden />
+    </label>
+    <small class="field__hint">Opcional. PDF o Word, hasta {{ maxArchivoMb }} MB.</small>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button class="btn-cancel" type="button" (click)="dialogVisible = false">Cancelar</button>
+      <button class="btn-save" type="button" (click)="save()" [disabled]="saving || !texto.trim()">
+        <i class="ti ti-device-floppy"></i>
+        {{ saving ? 'Guardando…' : 'Guardar' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>

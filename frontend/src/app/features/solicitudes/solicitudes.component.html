@@ -185,7 +185,7 @@
               [value]="sol.carrera.etiqueta"
               [style]="{ 'background': 'var(--ucm-teal)', 'color': '#fff' }"
             />
-            <span *ngIf="!sol.carrera" class="text-muted">—</span>
+            <span *ngIf="!sol.carrera" class="text-muted">{{ sol.facultad?.etiqueta || '—' }}</span>
           </td>
           <td class="col-ciudad">{{ lugar(sol) }}</td>
           <td *ngIf="useAllEndpoint" class="col-cliente" [title]="sol.cliente ? sol.cliente.nombres + ' ' + sol.cliente.apellidos : ''">
@@ -399,7 +399,7 @@
         <label class="field__label">Programa <span *ngIf="!viewOnly" class="required">*</span></label>
         <p-select
           formControlName="programaId"
-          [options]="programas"
+          [options]="programaOpciones"
           optionLabel="nombre"
           optionValue="id"
           placeholder="Seleccione el programa al que se asocia su solicitud"
@@ -412,6 +412,9 @@
         />
         <small class="field__error" *ngIf="form.get('programaId')?.invalid && form.get('programaId')?.touched">
           Debe seleccionar un programa de vinculación
+        </small>
+        <small class="field__hint" *ngIf="sinPrograma && !viewOnly">
+          Elige la facultad a la que diriges tu solicitud en la sección «Facultad y carrera».
         </small>
 
         <div class="programa-card" *ngIf="programaElegido as prog">
@@ -553,26 +556,30 @@
         />
       </div>
 
-      <h3 class="form-section field--full" *ngIf="!formIniciativa">Carrera asociada (opcional)</h3>
+      <h3 class="form-section field--full" *ngIf="!formIniciativa">Facultad y carrera</h3>
       <!-- Facultad -> Carrera (en dos pasos) -->
       <div class="field" *ngIf="!formIniciativa">
-        <label class="field__label">Facultad</label>
+        <label class="field__label">Facultad <span *ngIf="sinPrograma && !viewOnly" class="required">*</span></label>
         <p-select
           formControlName="facultadId"
           [options]="facultadesDropdown"
           optionLabel="label"
           optionValue="id"
           placeholder="Primero elige una facultad"
-          [showClear]="true"
+          [showClear]="!facultadBloqueada"
           (onChange)="onFacultadFormChange(form)"
           [style]="{ width: '100%' }"
           [scrollHeight]="'250px'"
           appendTo="body"
         />
+        <small class="field__hint" *ngIf="facultadBloqueada">Definida por el programa seleccionado.</small>
+        <small class="field__error" *ngIf="form.get('facultadId')?.invalid && form.get('facultadId')?.touched">
+          Selecciona la facultad a la que diriges tu solicitud
+        </small>
       </div>
 
       <div class="field" *ngIf="!formIniciativa">
-        <label class="field__label">Carrera</label>
+        <label class="field__label">Carrera (opcional)</label>
         <p-select
           formControlName="carreraId"
           [options]="carrerasDe(form.get('facultadId')?.value)"

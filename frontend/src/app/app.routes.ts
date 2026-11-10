@@ -83,6 +83,12 @@ export const routes: Routes = [
           import('./features/mis-vinculaciones/mis-vinculaciones.component').then(m => m.MisVinculacionesComponent),
       },
       {
+        path: 'dashboard/plan-estrategico',
+        canActivate: [noClienteGuard],
+        loadComponent: () =>
+          import('./features/plan-estrategico/plan-estrategico.component').then(m => m.PlanEstrategicoComponent),
+      },
+      {
         path: 'dashboard/reportes',
         loadComponent: () =>
           import('./features/reportes/reportes.component').then(m => m.ReportesComponent),

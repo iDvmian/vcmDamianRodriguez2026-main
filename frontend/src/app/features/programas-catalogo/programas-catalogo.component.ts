@@ -17,7 +17,7 @@ export class ProgramasCatalogoComponent implements OnInit {
   programas: Programa[] = [];
   loading = true;
   error = false;
-  busqueda = '';
+  seleccionadoId: number | null = null;
 
   private cdr = inject(ChangeDetectorRef);
 
@@ -28,16 +28,15 @@ export class ProgramasCatalogoComponent implements OnInit {
     return ['ADMIN', 'GESTOR_VCM', 'DIRECTOR_VCM'].includes(this.authService.getCurrentUser()?.rol ?? '');
   }
 
-  get filtrados(): Programa[] {
-    const q = this.normalizar(this.busqueda);
-    if (!q) return this.programas;
-    return this.programas.filter((p) => this.normalizar(`${p.nombre} ${p.descripcion ?? ''} ${p.actividades ?? ''}`).includes(q));
+  get seleccionado(): Programa | null {
+    return this.programas.find((p) => p.id === this.seleccionadoId) ?? null;
   }
 
   ngOnInit(): void {
     this.service.getProgramas().subscribe({
       next: (p) => {
         this.programas = p;
+        this.seleccionadoId = p[0]?.id ?? null;
         this.loading = false;
         this.cdr.detectChanges();
       },
@@ -51,9 +50,5 @@ export class ProgramasCatalogoComponent implements OnInit {
 
   actividadesDe(p: Programa): string[] {
     return (p.actividades ?? '').split('\n').map((a) => a.trim()).filter(Boolean);
-  }
-
-  private normalizar(t: string): string {
-    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 }

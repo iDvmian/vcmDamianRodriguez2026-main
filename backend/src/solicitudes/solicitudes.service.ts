@@ -24,6 +24,7 @@ import { CurrentUser } from '../auth/strategies/jwt.strategy';
 const SOLICITUD_INCLUDE = {
   cliente: { select: { id: true, nombres: true, apellidos: true, email: true, rut: true } },
   carrera: { include: { facultad: true } },
+  facultad: { select: { id: true, nombre: true, etiqueta: true } },
   programa: { select: { id: true, nombre: true } },
   archivos: true,
   planteamiento: { select: { id: true, estado: true, createdAt: true } },
@@ -44,7 +45,7 @@ export class SolicitudesService {
 
     if (estado !== undefined) where.estado = estado;
     if (ciudad) where.ciudad = ciudad;
-    if (facultadId !== undefined) where.carrera = { facultadId };
+    if (facultadId !== undefined) where.facultadId = facultadId;
     if (sinPlanteamiento) where.planteamiento = { is: null };
 
     if (fechaDesde || fechaHasta) {
@@ -88,9 +89,9 @@ export class SolicitudesService {
       if (query.carreraId !== undefined) where.carreraId = query.carreraId;
     }
 
-    // El Decano solo ve las solicitudes de las carreras de su facultad
+    // El Decano solo ve las solicitudes dirigidas a su facultad
     const facultadDecano = await facultadDelDecano(this.prisma, currentUser);
-    if (facultadDecano !== null) where.carrera = { is: { facultadId: facultadDecano } };
+    if (facultadDecano !== null) where.facultadId = facultadDecano;
 
     const [items, total] = await Promise.all([
       this.prisma.solicitud.findMany({
@@ -237,7 +238,7 @@ export class SolicitudesService {
     }
 
     const facultadDecano = await facultadDelDecano(this.prisma, currentUser);
-    if (facultadDecano !== null && solicitud.carrera?.facultadId !== facultadDecano) {
+    if (facultadDecano !== null && solicitud.facultadId !== facultadDecano) {
       throw new ForbiddenException('Esta solicitud no pertenece a tu facultad');
     }
 
@@ -294,6 +295,35 @@ export class SolicitudesService {
   private async validarPrograma(programaId: number) {
     const programa = await this.prisma.programa.findUnique({ where: { id: programaId } });
     if (!programa || !programa.activo) throw new BadRequestException('El programa de vinculación seleccionado no es válido');
+    return programa;
+  }
+
+  /**
+   * Facultad a la que queda dirigida la solicitud. Con programa es la del programa (no se puede
+   * cambiar); sin programa debe elegirse una. La carrera, si se indica, debe ser de esa facultad.
+   */
+  private async resolverFacultad(programaId: number | null | undefined, carreraId: number | null | undefined, facultadId: number | null | undefined) {
+    let facultad: number | null = null;
+    if (programaId) {
+      const programa = await this.validarPrograma(programaId);
+      facultad = programa.facultadId;
+      if (facultad !== null && facultadId && facultadId !== facultad) {
+        throw new BadRequestException('La facultad debe ser la del programa seleccionado');
+      }
+    }
+    if (facultad === null && facultadId) {
+      const f = await this.prisma.facultad.findUnique({ where: { id: facultadId } });
+      if (!f) throw new NotFoundException('Facultad no encontrada');
+      facultad = f.id;
+    }
+    if (carreraId) {
+      const carrera = await this.prisma.carrera.findUnique({ where: { id: carreraId } });
+      if (!carrera) throw new NotFoundException('Carrera no encontrada');
+      if (facultad === null) facultad = carrera.facultadId;
+      else if (carrera.facultadId !== facultad) throw new BadRequestException('La carrera no pertenece a la facultad de la solicitud');
+    }
+    if (facultad === null) throw new BadRequestException('Selecciona la facultad a la que diriges tu solicitud');
+    return facultad;
   }
 
   async create(dto: CreateSolicitudDto, currentUser: CurrentUser) {
@@ -311,19 +341,17 @@ export class SolicitudesService {
         throw new BadRequestException('Indica la organización o grupo con el que trabajarás');
       }
       carreraId = docente.carreraId;
-    } else if (carreraId !== undefined) {
-      const carrera = await this.prisma.carrera.findUnique({ where: { id: carreraId } });
-      if (!carrera) throw new NotFoundException('Carrera no encontrada');
     }
 
-    await this.validarPrograma(dto.programaId);
+    const facultadId = await this.resolverFacultad(dto.programaId, carreraId, dto.facultadId);
     const ubicacion = this.normalizarUbicacion(dto);
 
     const solicitud = await this.prisma.solicitud.create({
       data: {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
-        programaId: dto.programaId,
+        programaId: dto.programaId ?? null,
+        facultadId,
         ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,
@@ -360,15 +388,18 @@ export class SolicitudesService {
     const esIniciativaDocente = solicitud.origen === OrigenSolicitud.DOCENTE;
 
     // En una iniciativa de docente la carrera no se cambia (es la del docente)
-    if (!esIniciativaDocente && dto.carreraId !== undefined) {
-      const carrera = await this.prisma.carrera.findUnique({ where: { id: dto.carreraId } });
-      if (!carrera) throw new NotFoundException('Carrera no encontrada');
-    }
     if (esIniciativaDocente && dto.nombreOrganizacion !== undefined && !dto.nombreOrganizacion.trim()) {
       throw new BadRequestException('Indica la organización o grupo con el que trabajarás');
     }
 
-    if (dto.programaId !== undefined) await this.validarPrograma(dto.programaId);
+    // Programa, carrera o facultad cambian juntos: se revalida la facultad con lo que ya tenía
+    let facultadNueva: number | undefined;
+    if (dto.programaId !== undefined || dto.carreraId !== undefined || dto.facultadId !== undefined) {
+      const programaFinal = dto.programaId !== undefined ? dto.programaId : solicitud.programaId;
+      const carreraFinal = esIniciativaDocente || dto.carreraId === undefined ? solicitud.carreraId : dto.carreraId;
+      const facultadPedida = dto.facultadId ?? (programaFinal ? undefined : solicitud.facultadId);
+      facultadNueva = await this.resolverFacultad(programaFinal, carreraFinal, facultadPedida);
+    }
 
     // Si se toca algún dato de ubicación, se revalida todo junto con lo que ya tenía la solicitud
     const cambiaUbicacion = [dto.alcance, dto.ciudad, dto.region, dto.pais, dto.direccion].some((v) => v !== undefined);
@@ -388,6 +419,7 @@ export class SolicitudesService {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
         programaId: dto.programaId,
+        facultadId: facultadNueva,
         ...ubicacion,
         numeroDireccion: dto.numeroDireccion,
         telefono: dto.telefono,
@@ -451,9 +483,11 @@ export class SolicitudesService {
       );
     }
 
+    let carreraFacultadId: number | undefined;
     if (dto.carreraId !== undefined) {
       const carrera = await this.prisma.carrera.findUnique({ where: { id: dto.carreraId } });
       if (!carrera) throw new NotFoundException('Carrera no encontrada');
+      carreraFacultadId = carrera.facultadId;
     }
 
     const updated = await this.prisma.solicitud.update({
@@ -462,7 +496,7 @@ export class SolicitudesService {
         estado: dto.estado,
         // el motivo solo existe cuando está rechazada; en cualquier otro caso se limpia
         motivoRechazo: dto.estado === EstadoSolicitud.RECHAZADA ? dto.motivoRechazo?.trim() || null : null,
-        ...(dto.carreraId !== undefined && { carreraId: dto.carreraId }),
+        ...(dto.carreraId !== undefined && { carreraId: dto.carreraId, facultadId: carreraFacultadId }),
       },
       include: SOLICITUD_INCLUDE,
     });
@@ -538,7 +572,11 @@ export class SolicitudesService {
       data: {
         url,
         publicId,
-        nombre: file.originalname,
+        // Multer entrega el nombre en latin1: se recupera el UTF-8 original (tildes y ñ)
+        nombre: (() => {
+          const r = Buffer.from(file.originalname, 'latin1').toString('utf8');
+          return r.includes('\uFFFD') ? file.originalname : r;
+        })(),
         solicitudId,
       },
     });

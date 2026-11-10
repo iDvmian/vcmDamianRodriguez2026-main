@@ -41,6 +41,7 @@ export interface ReporteVistaPrevia {
     porEstado: { estado: string; cantidad: number }[];
     horasTotales: number | null;
     personasTotales: number | null;
+    gastoTotal: number | null;
   };
   filtros: string[];
 }

@@ -68,7 +68,7 @@ export class ProyectosService {
     // El Decano solo ve los proyectos de las carreras de su facultad
     const facultadDecano = await facultadDelDecano(this.prisma, currentUser);
     if (facultadDecano !== null) {
-      where.planteamiento = { solicitud: { carrera: { is: { facultadId: facultadDecano } } } };
+      where.planteamiento = { solicitud: { facultadId: facultadDecano } };
     }
 
     if (
@@ -90,18 +90,47 @@ export class ProyectosService {
     if (estado !== undefined) where.estado = estado;
     this.aplicarFiltros(where, query);
 
-    const [items, total] = await Promise.all([
-      this.prisma.proyecto.findMany({
-        where,
-        include: PROYECTO_INCLUDE,
-        skip,
-        take: limit,
-        orderBy: { id: 'desc' },
-      }),
-      this.prisma.proyecto.count({ where }),
-    ]);
+    const { items, total } = await this.paginar(where, query);
 
     return { data: { items, total, page, limit }, message: 'Proyectos obtenidos exitosamente', statusCode: 200 };
+  }
+
+  /** Página de proyectos según el orden pedido (por defecto, los más recientes primero). */
+  private async paginar(where: Record<string, unknown>, query: QueryProyectosDto) {
+    const { page = 1, limit = 10, orden = 'RECIENTES' } = query;
+    const skip = (page - 1) * limit;
+
+    // El gasto total es una suma de filas relacionadas, que la base de datos no permite ordenar directamente:
+    // se calcula por proyecto, se ordena y se pagina en memoria.
+    if (orden === 'GASTO_DESC' || orden === 'GASTO_ASC') {
+      const filas = await this.prisma.proyecto.findMany({
+        where,
+        select: { id: true, costos: { select: { tipo: true, monto: true } } },
+      });
+      const gasto = (c: { tipo: string; monto: number }[]) => c.filter((x) => x.tipo === 'GASTO').reduce((a, x) => a + x.monto, 0);
+      const signo = orden === 'GASTO_DESC' ? -1 : 1;
+      const ids = filas
+        .map((f) => ({ id: f.id, gasto: gasto(f.costos) }))
+        .sort((a, b) => signo * (a.gasto - b.gasto) || b.id - a.id)
+        .slice(skip, skip + limit)
+        .map((f) => f.id);
+      const encontrados = await this.prisma.proyecto.findMany({ where: { id: { in: ids } }, include: PROYECTO_INCLUDE });
+      const items = ids.map((id) => encontrados.find((p) => p.id === id)!).filter(Boolean);
+      return { items, total: filas.length };
+    }
+
+    const orderBy =
+      orden === 'FECHA_INICIO_DESC' ? [{ fechaInicio: 'desc' as const }, { id: 'desc' as const }]
+      : orden === 'FECHA_INICIO_ASC' ? [{ fechaInicio: 'asc' as const }, { id: 'desc' as const }]
+      : orden === 'ALUMNOS_DESC' ? [{ alumnos: { _count: 'desc' as const } }, { id: 'desc' as const }]
+      : orden === 'ALUMNOS_ASC' ? [{ alumnos: { _count: 'asc' as const } }, { id: 'desc' as const }]
+      : [{ id: 'desc' as const }];
+
+    const [items, total] = await Promise.all([
+      this.prisma.proyecto.findMany({ where, include: PROYECTO_INCLUDE, skip, take: limit, orderBy }),
+      this.prisma.proyecto.count({ where }),
+    ]);
+    return { items, total };
   }
 
   /** Filtros opcionales del listado (se combinan con AND con las restricciones por rol). */
@@ -109,7 +138,7 @@ export class ProyectosService {
     const { facultadId, carreraId, docenteId, programaId, tipoIntervencion, alcance } = query;
     const condiciones: Record<string, unknown>[] = [];
     if (facultadId !== undefined) {
-      condiciones.push({ planteamiento: { solicitud: { carrera: { is: { facultadId } } } } });
+      condiciones.push({ planteamiento: { solicitud: { facultadId } } });
     }
     if (carreraId !== undefined) condiciones.push({ planteamiento: { solicitud: { carreraId } } });
     if (docenteId !== undefined) condiciones.push({ planteamiento: { docenteId } });
@@ -129,16 +158,7 @@ export class ProyectosService {
     if (estado !== undefined) where.estado = estado;
     this.aplicarFiltros(where, query);
 
-    const [items, total] = await Promise.all([
-      this.prisma.proyecto.findMany({
-        where,
-        include: PROYECTO_INCLUDE,
-        skip,
-        take: limit,
-        orderBy: { id: 'desc' },
-      }),
-      this.prisma.proyecto.count({ where }),
-    ]);
+    const { items, total } = await this.paginar(where, query);
 
     return { data: { items, total, page, limit }, message: 'Mis proyectos obtenidos exitosamente', statusCode: 200 };
   }
@@ -148,7 +168,7 @@ export class ProyectosService {
     const facultadDecano = await facultadDelDecano(this.prisma, currentUser);
     if (facultadDecano === null) return;
     const pertenece = await this.prisma.proyecto.count({
-      where: { id: proyectoId, planteamiento: { solicitud: { carrera: { is: { facultadId: facultadDecano } } } } },
+      where: { id: proyectoId, planteamiento: { solicitud: { facultadId: facultadDecano } } },
     });
     if (!pertenece) throw new ForbiddenException('Este proyecto no pertenece a tu facultad');
   }

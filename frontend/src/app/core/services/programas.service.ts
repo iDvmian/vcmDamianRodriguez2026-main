@@ -11,6 +11,7 @@ export interface ProgramaDto {
   actividades?: string | null;
   orden?: number;
   activo?: boolean;
+  facultadId?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })

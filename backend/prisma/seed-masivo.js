@@ -8,12 +8,18 @@
  * Uso (desde la carpeta backend, con las migraciones ya aplicadas):
  *     node prisma/seed-masivo.js --confirmar
  *
+ * ES EL ÚNICO SCRIPT DE DATOS DE DEMOSTRACIÓN: deja todo el sistema poblado.
+ *
  * Crea: 7 facultades con sus carreras, 1 decano por facultad, 1 director de VCM,
  * gestores, 1 encargado por carrera, docentes, clientes, 150 alumnos voluntarios y
  * 600 solicitudes repartidas en planteamientos y proyectos (con historial de seguimiento).
  * Cada solicitud queda asociada a uno de los programas de vinculación y a un alcance
- * (regional, nacional o internacional). Los programas no se borran.
- * Contraseña de todos los usuarios creados: Demo1234
+ * (regional, nacional o internacional). Los programas no se borran, pero se asocian a su facultad.
+ * Cada proyecto trae su desglose de costos (gastos y aportes), personas alcanzadas, alumnos
+ * y observaciones. Cada facultad recibe sus Planes de Desarrollo Estratégico (ejes → objetivos
+ * globales → objetivos específicos → indicadores); el de la Facultad de Ciencias de la Ingeniería
+ * 2024 – 2028 parte de las Definiciones Estratégicas FACSI.
+ * Contraseña de todos los usuarios creados: Demo1234 (correos @demo.vcm.test)
  */
 try { require('dotenv').config(); } catch (_) {}
 const { PrismaClient } = require('@prisma/client');
@@ -149,13 +155,98 @@ const MOTIVOS_SOL = ['La iniciativa excede la capacidad actual de la carrera.','
 const MOTIVOS_PLA = ['La duración propuesta no es compatible con el calendario académico.','Se requiere detallar mejor los recursos y el equipo participante.','Las horas estimadas no se ajustan al alcance descrito.','El planteamiento no explicita los resultados esperados para la comunidad.'];
 const OBSERVACIONES = ['Se realizó la primera visita a terreno sin inconvenientes.','Los estudiantes completaron la planificación de actividades.','Se coordinó con el solicitante el cambio de fecha de la sesión.','Alta asistencia de la comunidad en la última jornada.','Se entregó material de apoyo impreso a los participantes.','Pendiente la autorización de acceso al recinto; se reprograma.','Se aplicó encuesta de satisfacción con buenos resultados.','Se incorporaron dos estudiantes voluntarios adicionales.','Se detectó la necesidad de una sesión de refuerzo.'];
 
+// ─── Programas por facultad ─────────────────────────────────────────────────
+// Todo programa pertenece a una facultad (sin programas universales)
+const PROGRAMA_FACULTAD = {
+  'KineTransForma': 'FCS', 'Telecuidado UCM': 'FCS', 'Prosalud UCM': 'FCS',
+  'Comercio Justo para el Desarrollo Rural': 'FCSE', 'Escuela de Formación Comunitaria': 'FCSE', 'Clínica Jurídica UCM': 'FCSE',
+  'Programa de Español para Migrantes': 'FCE', 'Programa de Educación Rural': 'FCE', 'Convivencia Escolar Formando Líderes para el Cambio': 'FCE',
+  'Akoluthía: Acompañando al Profesor de Religión en su Crecimiento Profesional': 'FCRF',
+  'Jornadas de Didáctica de las Ciencias Experimentales': 'FCB',
+  'Tejiendo Redes': 'FCSE', 'Club de Lectura del Adulto Mayor': 'FCE',
+};
+
+// ─── Costos de proyecto ─────────────────────────────────────────────────────
+// [concepto, mínimo, máximo] en pesos
+const GASTOS = [['Traslado', 40000, 400000], ['Alimentación', 30000, 250000], ['Materiales e insumos', 50000, 500000], ['Honorarios de expositor externo', 80000, 600000], ['Impresión y material de difusión', 20000, 150000], ['Arriendo de espacio o equipos', 60000, 450000], ['Alojamiento', 90000, 500000], ['Seguros y permisos', 20000, 120000]];
+const APORTES = [['Aporte de la facultad', 100000, 800000], ['Aporte del solicitante', 50000, 400000], ['Fondo concursable de vinculación', 150000, 1000000]];
+const monto = (min, max, factor = 1) => Math.max(5000, Math.round((int(min, max) * factor) / 5000) * 5000);
+
+// ─── Plan de Desarrollo Estratégico (modelo FACSI 2024 – 2028) ─────────────
+// eje → objetivos globales [texto, referencia UCM, objetivos específicos [texto, indicadores del objetivo global]]
+const PDE_EJES = [
+  ['Identidad y posicionamiento', [
+    ['Incorporar de manera sistemática y transversal iniciativas socioambientales en las actividades académicas, investigativas y de vinculación con el medio, abordando los objetivos de desarrollo sostenible (ODS).', 'UCM OG 2', [
+      ['Integrar los ODS en los programas de estudio de la Facultad.', ['Porcentaje de programas de estudio que incorporan los ODS.', 'Número de asignaturas con contenidos socioambientales.']],
+      ['Desarrollar iniciativas socioambientales con la comunidad.', ['Número de proyectos de vinculación con enfoque socioambiental.', 'Personas beneficiadas por iniciativas socioambientales.']]]],
+    ['Posicionar a la Facultad de Ingeniería como una comunidad integrada, comprometida con su entorno y con un sello valórico marcado en el quehacer institucional.', 'UCM OG 3', [
+      ['Fortalecer el sello valórico en las actividades de la Facultad.', ['Porcentaje de académicos que participan en actividades de formación valórica.', 'Número de actividades de identidad realizadas al año.']],
+      ['Aumentar la presencia de la Facultad en su entorno regional.', ['Número de convenios vigentes con organizaciones de la región.', 'Número de apariciones en medios regionales.']]]],
+    ['Promover en la comunidad UCM de manera sistemática y transversal iniciativas socioambientales en las actividades académicas, investigativas y de vinculación con el medio, abordando los ODS.', 'UCM OG 4', [
+      ['Instalar prácticas socioambientales en la comunidad universitaria.', ['Número de campañas socioambientales realizadas.', 'Porcentaje de estudiantes que participan en iniciativas socioambientales.']],
+      ['Medir el impacto de las iniciativas socioambientales.', ['Informe anual de impacto socioambiental publicado.', 'Porcentaje de iniciativas con evaluación de resultados.']]]],
+  ]],
+  ['Consolidar con Excelencia', [
+    ['Potenciar las competencias del perfil de egreso considerando los desafíos actuales y las necesidades del mercado laboral, para garantizar la formación de profesionales capaces de liderar soluciones innovadoras y sostenibles.', 'UCM OG 5', [
+      ['Actualizar los planes de estudio según las necesidades del mercado laboral.', ['Porcentaje de planes de estudio actualizados.', 'Tasa de empleabilidad de los egresados al primer año.']],
+      ['Fortalecer las competencias transversales de los estudiantes.', ['Porcentaje de estudiantes que cursan actividades de competencias transversales.', 'Nivel de satisfacción de empleadores con los egresados.']]]],
+    ['Promover una experiencia universitaria integral de calidad que contribuya al desarrollo académico, profesional y personal de los y las estudiantes, mediante espacios que fomenten la participación, la colaboración y el sentido de pertenencia.', 'UCM OG 6', [
+      ['Ampliar los espacios de participación estudiantil.', ['Número de actividades culturales, sociales y deportivas por año.', 'Porcentaje de estudiantes que participan en actividades extracurriculares.']],
+      ['Mejorar la retención de los estudiantes.', ['Tasa de retención de primer año.', 'Tasa de aprobación de asignaturas de primer año.']]]],
+    ['Fomentar una cultura de excelencia en los procesos de enseñanza y aprendizaje, investigación, vinculación e innovación, considerando los estándares de calidad institucional.', 'UCM OG 7', [
+      ['Asegurar la calidad de los programas de pre y postgrado.', ['Número de programas acreditados.', 'Porcentaje de programas con plan de mejora vigente.']],
+      ['Fortalecer las prácticas docentes innovadoras.', ['Porcentaje de docentes capacitados en metodologías activas.', 'Número de asignaturas con metodologías activas.']]]],
+    ['Integrar los programas académicos y la investigación para potenciar la formación de ingenieros e ingenieras capaces de generar soluciones innovadoras, basándose en un conocimiento científico que responda a las necesidades del entorno local y global.', 'UCM OG 8', [
+      ['Aumentar la producción científica de la Facultad.', ['Número de publicaciones indexadas por año.', 'Número de proyectos de investigación adjudicados.']],
+      ['Vincular la investigación con la formación de pregrado.', ['Número de estudiantes en proyectos de investigación.', 'Número de tesis asociadas a proyectos de investigación.']]]],
+  ]],
+  ['Gestión Sostenible', [
+    ['Impulsar la sostenibilidad financiera de la Facultad mediante la diversificación de ingresos y una gestión eficiente de recursos, integrando el conocimiento y las capacidades propias de sus disciplinas.', 'UCM OG 9', [
+      ['Diversificar las fuentes de ingreso de la Facultad.', ['Porcentaje de ingresos provenientes de fuentes distintas al arancel.', 'Monto de fondos externos adjudicados.']],
+      ['Mejorar la eficiencia en el uso de los recursos.', ['Ejecución presupuestaria anual.', 'Costo promedio por proyecto de vinculación.']]]],
+    ['Promover hacia la comunidad UCM una cultura de sostenibilidad, integrando prácticas ambientales responsables en sus actividades y formando profesionales comprometidos con el desarrollo de soluciones innovadoras y sustentables.', 'UCM OG 11', [
+      ['Reducir la huella ambiental de la Facultad.', ['Porcentaje de residuos reciclados.', 'Consumo de energía por persona.']],
+      ['Formar a la comunidad en prácticas sostenibles.', ['Número de talleres de sostenibilidad realizados.', 'Número de personas capacitadas en sostenibilidad.']]]],
+    ['Fomentar la transformación digital de la Facultad mediante la integración de herramientas tecnológicas para la gestión académica y administrativa, apoyando la transición digital institucional y fomentando una cultura de mejora continua.', 'UCM OG 12', [
+      ['Digitalizar los procesos académicos y administrativos.', ['Porcentaje de trámites disponibles en línea.', 'Tiempo promedio de resolución de trámites.']],
+      ['Capacitar al personal en herramientas digitales.', ['Porcentaje de funcionarios capacitados en herramientas digitales.', 'Nivel de uso de las plataformas institucionales.']]]],
+  ]],
+];
+// Plan anterior (más breve), para mostrar más de un PDE por facultad
+const PDE_ANTERIOR = [
+  ['Formación de excelencia', [
+    ['Asegurar la calidad de la formación de pregrado.', 'UCM OG 1', [
+      ['Mejorar los indicadores de progresión académica.', ['Tasa de retención de primer año.', 'Tasa de titulación oportuna.']]]],
+  ]],
+  ['Vinculación con el medio', [
+    ['Consolidar la relación con la comunidad y el sector productivo regional.', 'UCM OG 3', [
+      ['Aumentar los proyectos de vinculación con el medio.', ['Número de proyectos de vinculación al año.', 'Número de organizaciones con convenio vigente.']]]],
+  ]],
+];
+async function crearPlan(facultadId, periodo, ejes) {
+  const plan = await prisma.planEstrategico.create({ data: { facultadId, periodo } });
+  for (const [descripcion, ogs] of ejes) {
+    const eje = await prisma.ejeEstrategico.create({ data: { planId: plan.id, descripcion } });
+    for (const [textoOg, referenciaUcm, oes] of ogs) {
+      const og = await prisma.objetivoGlobal.create({ data: { ejeId: eje.id, descripcion: textoOg } });
+      // Objetivos específicos e indicadores globales cuelgan, ambos, del objetivo global
+      for (const [textoOe] of oes) {
+        await prisma.objetivoEspecifico.create({ data: { objetivoGlobalId: og.id, descripcion: textoOe } });
+      }
+      await prisma.indicadorGlobal.createMany({
+        data: oes.flatMap(([, indicadores]) => indicadores).map((descripcion) => ({ objetivoGlobalId: og.id, descripcion, referenciaUcm })),
+      });
+    }
+  }
+}
+
 async function main() {
   const ahora = new Date();
   const hash = await bcrypt.hash('Demo1234', 10);
 
   // ── 1. Reset ────────────────────────────────────────────────────────────────
   console.log('Borrando datos actuales...');
-  for (const m of ['observacion','archivoProyecto','proyectoAlumno','proyecto','archivoPlanteamiento','planteamiento','archivoSolicitud','historialEtapa','solicitud','registroDepuracion','alumnoVoluntario']) {
+  for (const m of ['indicadorGlobal','objetivoEspecifico','objetivoGlobal','ejeEstrategico','planEstrategico','costoProyecto','observacion','archivoProyecto','proyectoAlumno','proyecto','archivoPlanteamiento','planteamiento','archivoSolicitud','historialEtapa','solicitud','registroDepuracion','alumnoVoluntario']) {
     await prisma[m].deleteMany({});
   }
   await prisma.user.deleteMany({ where: { rol: { not: 'ADMIN' } } });
@@ -178,8 +269,10 @@ async function main() {
   };
 
   const decanosPorFac = [];
+  const facIdPorEtiqueta = new Map();
   for (const f of FACULTADES) {
     const fac = await prisma.facultad.create({ data: { nombre: f.nombre, etiqueta: f.etiqueta } });
+    facIdPorEtiqueta.set(f.etiqueta, fac.id);
     for (const [nombre, etiqueta] of f.carreras) {
       const c = await prisma.carrera.create({ data: { nombre, etiqueta, facultadId: fac.id } });
       carreras.push({ id: c.id, facultadId: fac.id, nombre });
@@ -222,16 +315,38 @@ async function main() {
 
   // ── 4. Cadena solicitud → planteamiento → proyecto ──────────────────────────
   const programas = await cargarProgramas();
+  // Cada programa queda asociado a su facultad
+  for (const [nombre, etiqueta] of Object.entries(PROGRAMA_FACULTAD)) {
+    await prisma.programa.updateMany({ where: { nombre }, data: { facultadId: facIdPorEtiqueta.get(etiqueta) } });
+  }
+  // Cualquier otro programa que exista queda en la facultad de Ingeniería
+  await prisma.programa.updateMany({ where: { facultadId: null }, data: { facultadId: facIdPorEtiqueta.get('FCI') } });
+  const facultadDePrograma = new Map((await prisma.programa.findMany({ select: { id: true, facultadId: true } })).map((p) => [p.id, p.facultadId]));
+
+  // Planes de Desarrollo Estratégico de cada facultad
+  for (const f of FACULTADES) {
+    const fid = facIdPorEtiqueta.get(f.etiqueta);
+    await crearPlan(fid, '2020 – 2024', PDE_ANTERIOR);
+    // El texto del PDE de la Facultad de Ingeniería sigue el documento FACSI; en las demás se generaliza
+    const generalizar = (t) => t.replace('Facultad de Ingeniería', 'Facultad').replace('ingenieros e ingenieras', 'profesionales');
+    const ejes = f.etiqueta === 'FCI' ? PDE_EJES
+      : PDE_EJES.map(([eje, ogs]) => [eje, ogs.map(([t, ref, oes]) => [generalizar(t), ref, oes])]);
+    await crearPlan(fid, '2024 – 2028', ejes);
+  }
   // Carreras con más actividad: ingeniería, salud, educación...
   const pesoCarrera = carreras.map((c, i) => [c, 1 + ((i * 7) % 5)]);
   const planes = []; // un plan por solicitud
   for (let i = 0; i < N_SOLICITUDES; i++) {
-    const carrera = pickW(pesoCarrera);
+    // ~8 % de las solicitudes no encaja en ningún programa y solo indica su facultad
+    const sinPrograma = rand() < 0.08;
+    const programaId = sinPrograma ? null : pickW(programas);
+    // Con programa, la carrera es de la facultad del programa
+    const candidatas = sinPrograma ? pesoCarrera : pesoCarrera.filter(([c]) => c.facultadId === facultadDePrograma.get(programaId));
+    const carrera = pickW(candidatas.length ? candidatas : pesoCarrera);
     const origenDocente = rand() < 0.12;
     const tipoCliente = origenDocente ? 'OTRO' : pickW(TIPOS_CLIENTE);
     const ub = ubicacionAleatoria(pickW(COMUNAS));
     const ciudad = ub.ciudad;
-    const programaId = pickW(programas);
     const tipoInt = pickW(TIPOS);
     const tema = pick(TEMAS);
     const pref = pick(ORG[tipoCliente]);
@@ -260,7 +375,7 @@ async function main() {
     return {
       titulo: `${TIPO_TEXTO[p.tipoInt]} de ${p.tema} en ${p.ciudad} (${p.i + 1})`,
       descripcion: `Se solicita apoyo de la universidad para realizar una actividad sobre ${p.tema} dirigida a la comunidad de ${p.ciudad}. ${p.nombreOrg ? 'La solicitud proviene de ' + p.nombreOrg + '. ' : ''}Se espera contar con estudiantes y docentes que acompañen el proceso.`,
-      programaId: p.programaId, alcance: p.ub.alcance, region: p.ub.region, pais: p.ub.pais,
+      programaId: p.programaId, facultadId: p.carrera.facultadId, alcance: p.ub.alcance, region: p.ub.region, pais: p.ub.pais,
       ciudad: p.ciudad, direccion: `Calle ${pick(APELLIDOS)}`, numeroDireccion: String(int(10, 2500)), telefono: tel(),
       estado: p.sol, motivoRechazo: rechazada ? pick(MOTIVOS_SOL) : null,
       tipoCliente: p.tipoCliente, tipoClienteOtro: p.tipoCliente === 'OTRO' && !p.origenDocente ? 'Comité vecinal' : null,
@@ -363,6 +478,27 @@ async function main() {
   }
   await bulk('proyectoAlumno', paData);
   await bulk('observacion', obsData);
+
+  // costos: gastos (siempre) y aportes (a veces) de cada proyecto
+  const costoData = [];
+  for (const p of conProyecto) {
+    const proyectoId = proPorPla.get(plaPorSol.get(p.solicitudId));
+    const factor = (p.ub.alcance === 'REGIONAL' ? 1 : p.ub.alcance === 'NACIONAL' ? 1.8 : 3) * (p.pro === 'CANCELADO' ? 0.4 : 1);
+    const conceptos = [...GASTOS].sort(() => rand() - 0.5).slice(0, int(2, 5));
+    const fecha = () => { const f = addDias(p.ini, int(0, Math.max(1, Math.round((p.fin - p.ini) / DIA)))); return f > ahora ? ahora : f; };
+    for (const [concepto, min, max] of conceptos) {
+      costoData.push({ proyectoId, concepto, tipo: 'GASTO', monto: monto(min, max, factor), fecha: fecha() });
+    }
+    if (rand() < 0.55) {
+      const [concepto, min, max] = pick(APORTES);
+      costoData.push({ proyectoId, concepto, tipo: 'INGRESO', monto: monto(min, max), fecha: fecha() });
+      if (rand() < 0.2) {
+        const [c2, min2, max2] = pick(APORTES.filter(([n]) => n !== concepto));
+        costoData.push({ proyectoId, concepto: c2, tipo: 'INGRESO', monto: monto(min2, max2), fecha: fecha() });
+      }
+    }
+  }
+  await bulk('costoProyecto', costoData);
   await bulk('historialEtapa', historial);
 
   // ── Resumen ─────────────────────────────────────────────────────────────────
@@ -372,7 +508,9 @@ async function main() {
   for (const r of ['ADMIN','DIRECTOR_VCM','DECANO','GESTOR_VCM','ENCARGADO_CARRERA','DOCENTE','CLIENTE']) console.log(`  ${r}:`, await cuenta('user', { rol: r }));
   console.log(' Alumnos voluntarios:', await cuenta('alumnoVoluntario'));
   console.log(' Solicitudes:', await cuenta('solicitud'), '| Planteamientos:', await cuenta('planteamiento'), '| Proyectos:', await cuenta('proyecto'));
-  console.log(' Historial:', await cuenta('historialEtapa'), '| Observaciones:', await cuenta('observacion'));
+  console.log(' Historial:', await cuenta('historialEtapa'), '| Observaciones:', await cuenta('observacion'), '| Costos:', await cuenta('costoProyecto'));
+  console.log(' Planes estratégicos:', await cuenta('planEstrategico'), '| Ejes:', await cuenta('ejeEstrategico'), '| Obj. globales:', await cuenta('objetivoGlobal'), '| Obj. específicos:', await cuenta('objetivoEspecifico'), '| Indicadores:', await cuenta('indicadorGlobal'));
+  console.log(' Programas con facultad:', await cuenta('programa', { facultadId: { not: null } }), 'de', await cuenta('programa'));
   console.log('\nContraseña de todos los usuarios creados: Demo1234');
   for (const r of ['DIRECTOR_VCM','DECANO','GESTOR_VCM','ENCARGADO_CARRERA','DOCENTE','CLIENTE']) {
     const u = await prisma.user.findFirst({ where: { rol: r }, orderBy: { id: 'asc' }, select: { email: true } });

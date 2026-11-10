@@ -156,6 +156,14 @@
           <span class="kpi__note">Alumnos distintos participando</span>
         </article>
         <article class="kpi">
+          <span class="kpi__label">Inversión en proyectos</span>
+          <span class="kpi__value">{{ fmtPesos(d.resumen.costos.gastos) }}</span>
+          <span class="kpi__note">
+            Gasto total · {{ d.resumen.costos.proyectosConCostos }} de {{ d.resumen.proyectos.total }} proyectos con gastos
+            <ng-container *ngIf="costoPorPersona(d) !== null"> · {{ fmtPesos(costoPorPersona(d)) }} por persona alcanzada</ng-container>
+          </span>
+        </article>
+        <article class="kpi">
           <span class="kpi__label">Duración promedio</span>
           <span class="kpi__value">{{ fmt(d.resumen.duracionPromedioDias, ' días') }}</span>
           <span class="kpi__note">De inicio a fin de cada proyecto</span>
@@ -219,6 +227,47 @@
           </div>
         </article>
       </section>
+
+      <!-- Costos de proyectos: de dónde viene el gasto y quién lo aporta -->
+      <section class="charts" *ngIf="d.resumen.costos.proyectosConCostos > 0; else sinCostos">
+        <article class="chart-card chart-card--wide inversion">
+          <div class="inversion__head">
+            <div>
+              <h2 class="chart-card__title">{{ tituloInversion }}</h2>
+              <p class="costos__hint">Invertido = gastos registrados en los proyectos.<span *ngIf="costoPorFacultad"> Haz clic en una facultad para ver sus carreras.</span></p>
+            </div>
+            <div class="inversion__total">
+              <span class="inversion__total-label">Total invertido</span>
+              <span class="inversion__total-valor">{{ fmtPesos(totalInvertido) }}</span>
+            </div>
+          </div>
+
+          <div class="inversion__reparto" *ngIf="unidadesInversion.length > 1" title="Parte del total invertido que corresponde a cada una">
+            <span *ngFor="let u of unidadesInversion" class="inversion__seg" [style.flex-grow]="u.gastos" [style.background]="u.color"
+                  [title]="u.nombre + ': ' + fmtPesos(u.gastos) + ' (' + u.pctTotal + '%)'"></span>
+          </div>
+
+          <div class="inversion__grid">
+            <article *ngFor="let u of unidadesInversion" class="inv" [class.inv--click]="u.facultadId !== null"
+                     (click)="u.facultadId !== null && seleccionarFacultad(u.facultadId)">
+              <div class="inv__top">
+                <span class="inv__punto" [style.background]="u.color"></span>
+                <span class="inv__nombre" [title]="u.nombre">{{ u.nombre }}</span>
+                <span class="inv__pct">{{ u.pctTotal }}%</span>
+              </div>
+              <span class="inv__valor">{{ fmtPesos(u.gastos) }}</span>
+              <div class="inv__pista"><div class="inv__barra" [style.width.%]="u.ancho" [style.background]="u.color"></div></div>
+              <div class="inv__pie">
+                <span>{{ u.proyectos }} {{ u.proyectos === 1 ? 'proyecto' : 'proyectos' }}</span>
+                <span>Promedio {{ fmtPesos(u.gastos / u.proyectos) }} por proyecto</span>
+              </div>
+            </article>
+          </div>
+        </article>
+      </section>
+      <ng-template #sinCostos>
+        <p class="panel__state">Aún no hay gastos cargados en los proyectos de este período. Se registran al crear un proyecto o desde su detalle.</p>
+      </ng-template>
 
       <p *ngIf="d.resumen.solicitudes.total === 0" class="panel__state">
         No hay solicitudes con los filtros elegidos.
